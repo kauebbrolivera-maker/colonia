@@ -261,11 +261,11 @@ const CONFIG = {
   COLONOS: [
     // pri = prioridades de trabalho (1 = mais importante ... 4, 0 = desligado)
     { nome: 'Ana',   pele: '#f0c8a0', cabelo: '#8a3b1c', roupa: '#a8463a', estilo: 'longo', comFerramentas: ['machado'],
-      pri: { corte: 1, mineracao: 3, coleta: 3, cultivo: 3, construcao: 2, fabricacao: 3, transporte: 3 } },
+      pri: { caca: 2, medico: 3, corte: 1, mineracao: 3, coleta: 3, cultivo: 3, construcao: 2, fabricacao: 3, transporte: 3 } },
     { nome: 'Bento', pele: '#c98e62', cabelo: '#231a14', roupa: '#46698f', estilo: 'curto', barba: true, comFerramentas: ['picareta'],
-      pri: { corte: 3, mineracao: 1, coleta: 3, cultivo: 3, construcao: 2, fabricacao: 3, transporte: 3 } },
+      pri: { caca: 3, medico: 2, corte: 3, mineracao: 1, coleta: 3, cultivo: 3, construcao: 2, fabricacao: 3, transporte: 3 } },
     { nome: 'Iara',  pele: '#8d5a3b', cabelo: '#141010', roupa: '#5f7f45', estilo: 'coque', comFerramentas: [],
-      pri: { cultivo: 1, corte: 3, mineracao: 3, coleta: 2, construcao: 1, fabricacao: 1, transporte: 2 } },
+      leve: true, pri: { medico: 1, caca: 3, cultivo: 1, corte: 3, mineracao: 3, coleta: 2, construcao: 1, fabricacao: 1, transporte: 2 } },
   ],
 };
 
@@ -549,6 +549,10 @@ const ITEM = {
   MILHO:   { nome: 'Milho', max: 75 },
   MACHADO: { nome: 'Machado', max: 1, ferramenta: 'machado' },
   PICARETA: { nome: 'Picareta', max: 1, ferramenta: 'picareta' },
+  ESPADA: { nome: 'Espada', max: 1, equip: 'arma' }, ARCO: { nome: 'Arco', max: 1, equip: 'arma' }, ESCUDO: { nome: 'Escudo', max: 1, equip: 'escudo' },
+  FLECHAS: { nome: 'Flechas', max: 40, equip: 'municao' }, BANDAGEM: { nome: 'Bandagem', max: 20, equip: 'medico' },
+  CARNE: { nome: 'Carne', max: 75 }, PELE: { nome: 'Pele', max: 30 },
+  CARC_VEADO: { nome: 'Carcaça de veado', max: 1 }, CARC_LOBO: { nome: 'Carcaça de lobo', max: 1 }, CARC_URSO: { nome: 'Carcaça de urso', max: 1 },
 };
 const itens = [];         // {x, y, tipo, qtd, reservado}
 const itemEm = new Map(); // idx -> item
@@ -604,7 +608,7 @@ function estoque() {
   for (const t of mapa.zonaTiles) { const it = itemEm.get(idx(t.x, t.y)); if (it) r[it.tipo] += it.qtd; }
   return r;
 }
-const COMIDA = new Set(['FRUTAS', 'MILHO']);
+const COMIDA = new Set(['FRUTAS', 'MILHO', 'CARNE']);
 function frutasTotais() { let n = 0; for (const it of itens) if (COMIDA.has(it.tipo)) n += it.qtd; return n; }
 function gerarItens(rng) {
   itens.length = 0; itemEm.clear();
@@ -731,6 +735,15 @@ const bloqueiaEstr = e => e === 1 || e === 2 || e === 4;
 const RECEITAS = { // feitas na bancada (materiais saem do estoque quando começa)
   MACHADO:  { nome: 'Machado',  custo: { MADEIRA: 4, PEDRA: 2 }, tempo: 90 },
   PICARETA: { nome: 'Picareta', custo: { MADEIRA: 4, PEDRA: 3 }, tempo: 110 },
+  ESPADA:   { nome: 'Espada',   custo: { MADEIRA: 2, PEDRA: 8 }, tempo: 150 },
+  ARCO:     { nome: 'Arco',     custo: { MADEIRA: 8 }, tempo: 120 },
+  FLECHAS:  { nome: 'Flechas (x12)', custo: { MADEIRA: 4 }, tempo: 60, saida: { FLECHAS: 12 } },
+  ESCUDO:   { nome: 'Escudo',   custo: { MADEIRA: 8, PEDRA: 2 }, tempo: 110 },
+  BANDAGEM: { nome: 'Bandagens de pele (x3)', custo: { PELE: 1 }, tempo: 40, saida: { BANDAGEM: 3 } },
+  BANDAGEM_FIBRA: { nome: 'Bandagem de fibra', custo: { FRUTAS: 4 }, tempo: 40, saida: { BANDAGEM: 1 } },
+  CARNEAR_VEADO: { nome: 'Carnear veado', custo: { CARC_VEADO: 1 }, tempo: 70, saida: { CARNE: 24, PELE: 2 }, auto: true },
+  CARNEAR_LOBO:  { nome: 'Carnear lobo',  custo: { CARC_LOBO: 1 },  tempo: 60, saida: { CARNE: 12, PELE: 2 }, auto: true },
+  CARNEAR_URSO:  { nome: 'Carnear urso',  custo: { CARC_URSO: 1 },  tempo: 110, saida: { CARNE: 45, PELE: 4 }, auto: true },
 };
 const textoCusto = c => Object.entries(c).map(([t, q]) => `${q} ${ITEM[t].nome.toLowerCase()}`).join(' + ');
 // material de uma obra: a obra pede um tipo só
@@ -845,8 +858,8 @@ function consumirMateriais(custo) {
 }
 
 /* ============================ PRIORIDADES ============================ */
-const CATEGORIAS = [['corte', 'Corte'], ['mineracao', 'Mineração'], ['coleta', 'Coleta'], ['cultivo', 'Cultivo'], ['construcao', 'Construção'], ['fabricacao', 'Fabricação'], ['transporte', 'Transporte']];
-const CAT_DE = { cortar: 'corte', minerar: 'mineracao', colher: 'coleta', entregar: 'construcao', construir: 'construcao', desconstruir: 'construcao', fabricar: 'fabricacao', carregar: 'transporte', semear: 'cultivo', colherPlantio: 'cultivo' };
+const CATEGORIAS = [['corte', 'Corte'], ['mineracao', 'Mineração'], ['coleta', 'Coleta'], ['cultivo', 'Cultivo'], ['construcao', 'Construção'], ['fabricacao', 'Fabricação'], ['transporte', 'Transporte'], ['caca', 'Caça'], ['medico', 'Médico']];
+const CAT_DE = { cortar: 'corte', minerar: 'mineracao', colher: 'coleta', entregar: 'construcao', construir: 'construcao', desconstruir: 'construcao', fabricar: 'fabricacao', carregar: 'transporte', semear: 'cultivo', colherPlantio: 'cultivo', lutar: 'caca', tratar: 'medico', resgatar: 'medico' };
 
 /* ======================= EVENTOS · VISITANTES ======================== */
 const visitantes = [];
@@ -858,10 +871,14 @@ function checarEventos() {
   const op = [];
   if (!estado.chuva) op.push('chuva');
   if (!visitantes.length) op.push('visitante');
+  if (!animais.some(a => a.esp === 'lobo') && agora() > 1440) op.push('lobos', 'lobos');
+  if (animais.filter(a => a.esp === 'veado').length < 3) op.push('veados');
+  if (!animais.some(a => a.esp === 'urso') && rnd() < 0.3) op.push('urso');
   if (op.length) dispararEvento(sortear(op));
   agendarEvento();
 }
 function dispararEvento(tipo) {
+  if (['lobos', 'urso', 'veados'].includes(tipo)) return dispararEventoV8(tipo);
   if (tipo === 'chuva') {
     const h = 4 + rnd() * 5;
     estado.chuva = { fim: agora() + h * 60, forca: estado.chuva ? estado.chuva.forca : 0 };
@@ -950,7 +967,7 @@ function atualizarChuva(horas) {
   if (!alvo && ch.forca <= 0) { estado.chuva = null; log('A chuva parou.'); return; }
   if (ch.forca > 0.3) for (const c of colonos) if (!(c.dormindo && c.naCama) && !temTeto(c)) memorizar(c, 'chuva', 'Molhado pela chuva', -4, 3);
 }
-const novasStats = () => ({ arvores: 0, rochas: 0, paredes: 0, camas: 0, bancadas: 0, fabricados: 0, desconstruidos: 0, chuva: 0, visitante: 0, portas: 0, passagensPorta: 0, semeados: 0, colhidos: 0 });
+const novasStats = () => ({ arvores: 0, rochas: 0, paredes: 0, camas: 0, bancadas: 0, fabricados: 0, desconstruidos: 0, chuva: 0, visitante: 0, portas: 0, passagensPorta: 0, semeados: 0, colhidos: 0, feridas: 0, desmaios: 0, tratamentos: 0, resgates: 0, infeccoes: 0, infeccoesTratadas: 0, infeccoesCuradas: 0, curadas: 0, bandagensUsadas: 0, abatidos: 0, ataques: 0, bloqueios: 0, flechas: 0, flechasAcerto: 0, cacadas: 0, emboscadasOk: 0, emboscadasFalha: 0, cacadasDetectadas: 0, eventoLobos: 0, anims: {}, carregar: {} });
 
 /* ============================= COLONOS ==============================
    IA simples por prioridade (reavaliada quando o colono fica sem tarefa):
@@ -996,6 +1013,7 @@ function criarColonos() {
       avisouFome: false, imgSheet: null, cama: null, ultimoTrabalho: null,
       prioridades: { ...def.pri }, ferramentas: { machado: def.comFerramentas.includes('machado'), picareta: def.comFerramentas.includes('picareta') },
       camaPropria: null, naCama: false, acaoF: 0, aAcaoF: 0,
+      saude: novaSaude(), arma: null, escudo: false, flechas: 0, bandagens: 0,
     });
   });
   // um lugar para dormir (saco de dormir) para cada um, ao norte do centro
@@ -1044,6 +1062,7 @@ function melhorAlvo(c, cands, tentativas = 4) {
 function liberar(c) {
   const t = c.tarefa;
   if (!t) return;
+  liberarV8(c, t);
   if (t.i !== undefined && reservas.get(t.i) === c) reservas.delete(t.i);
   if (t.item && t.item.reservado === c) t.item.reservado = null;
 }
@@ -1074,7 +1093,7 @@ function iniciarVagar(c) {
   c.pensarT = 1.5;
 }
 function iniciarDormir(c) {
-  const s = tileDe(c), b = c.camaPropria;
+  const s = tileDe(c), b = c.camaPropria && !(c.camaPropria.paciente && c.camaPropria.paciente !== c && ocupaCama(c.camaPropria.paciente)) ? c.camaPropria : null;
   let cam = b ? aEstrela(s.x, s.y, b.x, b.y) : null;
   c.naCama = !!cam;
   if (!cam) cam = aEstrela(s.x, s.y, c.cama.x, c.cama.y);
@@ -1113,6 +1132,7 @@ function tentarPegarFerramenta(c, tipoTarefa) {
 }
 function iniciarTrabalho(c) {
   const P = c.prioridades;
+  if (tarefaMedicaUrgente(c)) return true;
   if (tentarPegarFerramenta(c, 'cortar') || tentarPegarFerramenta(c, 'minerar')) return true; // ferramenta sobrando por perto: pega antes de trabalhar
   const comecar = (r) => {
     const a = r.alvo;
@@ -1162,19 +1182,20 @@ function iniciarTrabalho(c) {
   if (P.coleta && frutasTotais() < 60)
     for (const i of mapa.arbustos) if (mapa.arvore[i] === ARBUSTO && mapa.frutos[i] && !reservas.has(i)) cands.coleta.push({ x: i % mapa.L, y: (i / mapa.L) | 0, adj: true, i, tipo: 'colher' });
   if (P.transporte) for (const it of itens) if (!it.reservado && !naZona(it.x, it.y) && destinoZona(it.tipo, it)) cands.transporte.push({ x: it.x, y: it.y, adj: false, item: it });
+  candidatosV8(c, P, cands);
   for (let n = 1; n <= 4; n++) {
     const lista = [];
     for (const [k] of CATEGORIAS) if (P[k] === n) lista.push(...cands[k]);
     if (!lista.length) continue;
     const r = melhorAlvo(c, lista);
-    if (r && comecar(r)) return true;
+    if (r && (r.alvo.v8 ? iniciarV8(c, r) : comecar(r))) return true;
   }
   return false;
 }
 // ---- conversas: acontecem "de lado", enquanto trabalham ou passeiam (não param a tarefa) ----
 const conversas = []; // {a, b, falas:[[colono, texto]], timer, briga}
 const emConversa = c => conversas.find(v => v.a === c || v.b === c);
-const podeConversar = c => !c.dormindo && c.cdConversa <= agora() && !emConversa(c);
+const podeConversar = c => !c.dormindo && c.cdConversa <= agora() && !emConversa(c) && !(c.saude && c.saude.caido) && !c.carregadoPor && !(c.tarefa && ['lutar', 'fugir', 'cacada', 'resgatar'].includes(c.tarefa.tipo)); // ferido caído, carregado, lutando ou caçando em silêncio: não puxa conversa
 function tentarConversa(c) {
   if (!podeConversar(c) || rnd() > CONFIG.CHANCE_CONVERSA) return;
   const o = colonos.find(o => o !== c && podeConversar(o) && Math.hypot(o.x - c.x, o.y - c.y) < 5);
@@ -1188,7 +1209,7 @@ function tentarConversa(c) {
 function atualizarConversas(dt) {
   for (let k = conversas.length - 1; k >= 0; k--) {
     const v = conversas[k], { a: c, b: o } = v;
-    if (c.dormindo || o.dormindo || Math.hypot(o.x - c.x, o.y - c.y) > 9) { conversas.splice(k, 1); continue; } // interrompida
+    if (c.dormindo || o.dormindo || Math.hypot(o.x - c.x, o.y - c.y) > 9 || (c.saude && c.saude.caido) || (o.saude && o.saude.caido)) { conversas.splice(k, 1); continue; } // interrompida
     v.timer -= dt;
     if (v.timer > 0) continue;
     if (v.falas.length) { const [quem, texto] = v.falas.shift(); quem.balao = { texto, t: 2.2 }; v.timer = 1.9; continue; }
@@ -1209,8 +1230,11 @@ function escolherTarefa(c) {
   const querDormir = c.sono < 15 || ((h >= 22 || h < 5) && c.sono < 80);
   // come antes de dormir se estiver com fome (a não ser que esteja exausto)
   if ((c.fome < 35 || (querDormir && c.fome < 50)) && c.sono >= 8 && iniciarComer(c)) return;
+  if (fatorMov(c) > 0.45 && !saude(c).caido && tarefaMedicaUrgente(c)) return;
+  if (querRepousar(c)) return iniciarRepouso(c);
   if (querDormir) return iniciarDormir(c);
   if (c.triste) return iniciarVagar(c);
+  if (tentarEquipar(c)) return;
   if (iniciarTrabalho(c)) return;
   if (tentarPegarFerramenta(c, 'cortar') || tentarPegarFerramenta(c, 'minerar')) return; // à toa e sem ferramenta: vai buscar uma
   iniciarVagar(c);
@@ -1295,18 +1319,24 @@ function atualizarColono(c, dt, horasJogo) {
     if (c.tarefa && TAREFA_TRABALHO.includes(c.tarefa.tipo)) cancelar(c);
   } else if (c.triste && c.humor > CONFIG.HUMOR_TRISTE + 15) { c.triste = false; log(`${c.nome} se sente melhor.`, 'bom'); }
   if (c.balao) { c.balao.t -= dt; if (c.balao.t <= 0) c.balao = null; }
+  if (atualizarColonoV8(c, dt, horasJogo)) return;
+  if (c.prioridades.medico && c.tarefa && ((c.tarefa.tipo === 'dormir' && c.sono > 20) || (c.tarefa.tipo === 'repousar' && c.tarefa.fase === 'deitado' && fatorMov(c) > 0.45 && !saude(c).caido)) && (c.chkResg = (c.chkResg || 0) - dt) <= 0) {
+    c.chkResg = 2;
+    if (colonos.some(p => p !== c && saude(p).caido && !p.resgatador && !p.carregadoPor && !(p.tarefa && p.tarefa.tipo === 'repousar'))) { const tp = c.tarefa.tipo; cancelar(c); c.dormindo = false; c.naCama = false; c.saiuCama = agora(); log(`${c.nome} ${tp === 'dormir' ? 'acorda' : 'se levanta'} para socorrer quem caiu.`); }
+  }
 
   // --- interrupções por necessidade urgente ---
   c.checarT -= dt;
   if (c.checarT <= 0) {
     c.checarT = 1;
     tentarConversa(c);
+    if (c.prioridades.medico && c.tarefa && INTERROMPIVEL.includes(c.tarefa.tipo) && colonos.some(p => p !== c && !p.resgatador && !p.carregadoPor && !p.medico && ((saude(p).caido && !(p.tarefa && p.tarefa.tipo === 'repousar')) || saude(p).feridas.some(f => !f.trat && f.sangra > 0) || saude(p).feridas.some(infecPede)))) cancelar(c);
     if (c.tarefa && INTERROMPIVEL.includes(c.tarefa.tipo) &&
         (c.sono < 12 || (c.fome < 20 && existeComida()) || ((h >= 22 || h < 5) && c.sono < 80 && c.tarefa.tipo === 'vagar'))) cancelar(c);
   }
   // --- escolher tarefa ---
   if (!c.tarefa) { c.pensarT -= dt; if (c.pensarT <= 0) { c.pensarT = 0.5; escolherTarefa(c); } }
-  mover(c, dt, c.tarefa && c.tarefa.tipo === 'vagar' ? 0.6 : 1);
+  mover(c, dt, (c.tarefa && c.tarefa.tipo === 'vagar' ? 0.6 : 1) * fatorMovTotal(c));
   // --- executar tarefa ---
   executar(c, dt, horasJogo * 60);
 }
@@ -1323,6 +1353,7 @@ const ACOES = {
   entalhar: { ritmo: 1.9,  golpes: [0.6] },
 };
 function tipoAcao(c, t) {
+  const v8 = tipoAcaoV8(c, t); if (v8) return v8;
   switch (t.tipo) {
     case 'cortar': return c.ferramentas.machado ? 'machado' : 'socar';
     case 'minerar': return c.ferramentas.picareta ? 'picareta' : 'socar';
@@ -1347,6 +1378,7 @@ const fatorFerramenta = (c, t) => FERRAMENTA_DE[t.tipo] ? (c.ferramentas[FERRAME
 function executar(c, dt, min) {
   const t = c.tarefa;
   if (!t) return;
+  if (executarV8(c, dt, min)) return;
   const chegou = c.caminho.length === 0;
   switch (t.tipo) {
     case 'mover':
@@ -1359,7 +1391,7 @@ function executar(c, dt, min) {
       if (!alvoValido(t)) { fim(c); break; }
       if (t.fase === 'indo') { if (chegou) { t.fase = 'fazendo'; c.acaoF = c.aAcaoF = 0; } break; }
       virarPara(c, t.alvo.x, t.alvo.y);
-      t.progresso += min * fatorFerramenta(c, t);
+      t.progresso += min * fatorFerramenta(c, t) * fatorTrab(c);
       if (t.tipo === 'construir') t.obra.progresso = t.progresso / t.total;
       avancarAcao(c, t, dt);
       if (t.progresso >= t.total) { concluir(c, t); fim(c); }
@@ -1377,12 +1409,12 @@ function executar(c, dt, min) {
         t.fase = 'fazendo'; c.acaoF = c.aAcaoF = 0; b.por = c;
       }
       virarPara(c, b.x, b.y);
-      b.progresso += min; t.progresso = b.progresso; t.total = b.total;
+      b.progresso += min * fatorTrab(c); t.progresso = b.progresso; t.total = b.total;
       avancarAcao(c, t, dt);
       if (b.progresso >= b.total) {
         const tipo = b.fazendo; b.fazendo = null; b.progresso = 0; b.por = null;
         const p = livrePerto(b.x, b.y) || tileDe(c);
-        largarItem(p.x, p.y, tipo, 1);
+        for (const [k, q] of Object.entries(RECEITAS[tipo].saida || { [tipo]: 1 })) largarItem(p.x, p.y, k, q);
         estado.stats.fabricados++;
         efeitoPronto((b.x + 0.5) * T, b.y * T + 4, true);
         log(`${c.nome} fabricou um(a) ${RECEITAS[tipo].nome.toLowerCase()}.`, 'bom');
@@ -1393,7 +1425,7 @@ function executar(c, dt, min) {
     case 'pegar':
       if (!itemExiste(t.item)) { fim(c); break; }
       if (!chegou) break;
-      { const it = t.item; removerItem(it); c.ferramentas[ITEM[it.tipo].ferramenta] = true; log(`${c.nome} pegou um(a) ${ITEM[it.tipo].nome.toLowerCase()}.`); fim(c); }
+      { const it = t.item; if (ITEM[it.tipo].equip) { equipar(c, it); fim(c); break; } removerItem(it); c.ferramentas[ITEM[it.tipo].ferramenta] = true; log(`${c.nome} pegou um(a) ${ITEM[it.tipo].nome.toLowerCase()}.`); fim(c); }
       break;
     case 'entregar':
       if (mapa.obra.get(t.i) !== t.obra) { cancelar(c); break; }
@@ -1464,6 +1496,7 @@ function descreverAtividade(c) {
 function descreverTarefa(c) {
   const t = c.tarefa;
   if (!t) return c.triste ? 'Triste — recusa trabalho.' : 'À toa.';
+  { const d8 = descreverTarefaV8(c, t); if (d8) return d8; }
   const pct = t.total ? ` (${Math.floor(Math.min(1, t.progresso / t.total) * 100)}%)` : '';
   const nomeAlvo = t.i !== undefined && mapa.arvore[t.i] ? ESPECIES[mapa.arvore[t.i] - 1].nome.toLowerCase() : '';
   const maos = FERRAMENTA_DE[t.tipo] && !c.ferramentas[FERRAMENTA_DE[t.tipo]] ? ' com as mãos' : '';
@@ -1837,6 +1870,7 @@ function desenharItem(g, it, cx, cy) {
   g.lineJoin = 'round';
   const nome = it.tipo === 'PEDRA' ? 'item_pedra_' + ((it.x * 7 + it.y * 3) % 3 + 3) % 3 : SPR_ITEM[it.tipo];
   if (nome && spr(g, nome, cx - 15, cy - 15, 30, 30)) return;
+  if (desenharItemV8(g, it, cx, cy)) return;
   if (it.tipo === 'MACHADO' || it.tipo === 'PICARETA') return desenharItemFerramenta(g, it.tipo, cx, cy);
   if (it.tipo === 'MADEIRA') {
     elipse(g, cx + 2, cy + 8, 12, 3.5); g.fillStyle = 'rgba(0,0,0,0.25)'; g.fill();
@@ -1888,8 +1922,10 @@ function desenharColono(g, c, x, y, p = {}) {
   const w = p.w || 0, F = (p.fase || 0) * Math.PI * 2, carrega = p.carregando || null;
   const mola = N === 2 ? (p.mola || 0) : 0;
   const lx = co, ly = -s * 0.5, fx = s, fy = co * 0.55; // eixo lateral e eixo "para frente" (projetados na tela)
-  const corpoY = bobCorpo(p.fase || 0, w, !!carrega) + (p.respira || 0) * (1 - w);
-  const inclina = N === 0 ? 0 : (carrega ? -s * 0.04 : s * 0.09) * w + (N === 2 ? Math.sin(F) * 0.025 * w : 0);
+  const ajo = p.ajoelha || 0, agc = p.agacha || 0, sen = p.sentado || 0;
+  const corpoY = bobCorpo(p.fase || 0, w, !!carrega) * (1 - agc * 0.5) + (p.respira || 0) * (1 - w) + ajo * 4.2 + agc * 2.6 + sen * 3.5
+    + (p.manca ? Math.max(0, Math.sin(F + (p.manca > 0 ? 0 : Math.PI))) * 2.2 * w * Math.min(1, Math.abs(p.manca)) : 0); // manca: afunda ao pisar com a perna ferida
+  const inclina = (N === 0 ? 0 : (carrega ? -s * 0.04 : s * 0.09) * w + (N === 2 ? Math.sin(F) * 0.025 * w : 0)) + (p.manca ? Math.sign(p.manca) * 0.08 * w : 0) + agc * 0.06 * Math.sign(s || 1) + (p.inclinaExtra || 0);
   const quadril = N === 0 ? 0 : Math.cos(F) * 0.45 * w;
   const passoA = (N === 2 ? 3.4 : 3.0) * w * (carrega ? 0.75 : 1);
   g.save(); g.translate(x, y);
@@ -1901,10 +1937,11 @@ function desenharColono(g, c, x, y, p = {}) {
   } else { elipse(g, 0, 12, N ? 9 : 8, N ? 3.4 : 3); g.fillStyle = N ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.2)'; g.fill(); }
   g.lineJoin = 'round'; g.strokeStyle = CONTORNO;
   // pés alternados (aparecem sob o corpo)
-  if (N > 0) {
+  if (N > 0 && !p.semPes) {
     const pes = [-1, 1].map(sd => {
       const psi = F + (sd > 0 ? 0 : Math.PI), d = Math.sin(psi) * passoA, lift = Math.max(0, Math.cos(psi)) * 1.7 * w;
-      return { x: lx * sd * 3 + fx * d + quadril * lx, y: 12 + ly * sd * 3 + fy * d - lift, lift, prof: ly * sd };
+      const kn = (p.ajoelha || 0) * (sd > 0 ? 4.5 : -0.5) + (p.sentado || 0) * 5;
+      return { x: lx * sd * 3 + fx * (d + kn) + quadril * lx, y: 12 + ly * sd * 3 + fy * (d + kn) - lift + (p.ajoelha || 0) * 1.2, lift, prof: ly * sd };
     }).sort((a, b) => a.prof - b.prof);
     for (const pe of pes) {
       elipse(g, pe.x, pe.y, 2.2 + Math.abs(s) * 0.9, 1.6 * (N === 2 ? 1 - pe.lift * 0.12 : 1), N === 2 ? -fx * pe.lift * 0.25 : 0);
@@ -1929,7 +1966,12 @@ function desenharColono(g, c, x, y, p = {}) {
     return { x: hx, y: hy, atras: ly * sd < -0.15 };
   });
   let ferr = null; // pose de trabalho: substitui as mãos e mostra a ferramenta
-  if (p.acao) { const pa = poseAcao(p.acao, lx, ly, fx, fy, co, s); maos = pa.maos; ferr = pa.ferr; }
+  let prop = null;
+  if (p.acao) { const pa = poseAcao(p.acao, lx, ly, fx, fy, co, s, corpoY); if (pa.maos) maos = pa.maos; ferr = pa.ferr || null; prop = pa.prop || null; }
+  if (p.bracoMole && !p.acao && !carrega) { const k = p.bracoMole > 0 ? 1 : 0, sd = p.bracoMole; maos[k] = { x: lx * sd * (bw - 1.4), y: 11 + ly * sd * (bw - 1.4), atras: maos[k].atras }; } // braço pendurado, sem balançar
+  if (p.estende) { const k = p.estende > 0 ? 1 : 0, sd = p.estende; maos[k] = { x: lx * sd * 4 + fx * 8.5, y: 5 + ly * sd * 4 + fy * 8.5, atras: false }; }
+  if (p.agacha && !p.acao && !carrega) maos = maos.map((m, k) => ({ x: lx * (k ? 1 : -1) * 4.5 + fx * 5, y: 8 + ly * (k ? 1 : -1) * 4.5 + fy * 5, atras: m.atras }));
+  if (p.maosExtra) maos = p.maosExtra(maos, { lx, ly, fx, fy, bw, co, s });
   const mao = m => {
     circulo(g, m.x, m.y, 2.3); g.fillStyle = c.pele; g.fill(); g.lineWidth = 1.2; g.strokeStyle = CONTORNO; g.stroke();
     if (m.fruta) { circulo(g, m.x + 0.9, m.y - 1.3, 1.5); g.fillStyle = '#b8223a'; g.fill(); g.lineWidth = 0.6; g.stroke(); }
@@ -1938,6 +1980,7 @@ function desenharColono(g, c, x, y, p = {}) {
   if (carrega && !frente) itemCarregado();
   if (ferr && ferr.atras) desenharFerramenta(g, ferr);
   for (const m of maos) if (m.atras && !m.sobre) mao(m);
+  if ((p.escudo || p.bloqueio) && co < -0.25) desenharEscudoNoColono(g, p, maos, lx, ly, fx, fy);
   elipse(g, 0, 5, bw, 7.3); g.fillStyle = c.roupa; g.fill();
   g.save(); g.clip();
   elipse(g, 2 + s, 10, bw + 1, 5); g.fillStyle = 'rgba(0,0,0,0.2)'; g.fill();
@@ -1951,10 +1994,13 @@ function desenharColono(g, c, x, y, p = {}) {
   if (ferr && !ferr.atras) desenharFerramenta(g, ferr);
   for (const m of maos) if (!m.atras && !m.sobre) mao(m);
   // cabeça (um pouco à frente quando anda)
-  g.save(); g.translate(N === 0 ? 0 : fx * 0.9 * w, (N === 0 ? 0 : fy * 0.8 * w) + mola * 0.35);
+  g.save(); g.translate((N === 0 ? 0 : fx * 0.9 * w) + (p.careta ? Math.sin(tempoReal * 46) * p.careta * 0.9 : 0), (N === 0 ? 0 : fy * 0.8 * w) + mola * 0.35);
   desenharCabeca(g, c, s, co, p.fechados, mola);
   g.restore();
   for (const m of maos) if (m.sobre) mao(m); // mão na boca (comendo) fica na frente do rosto
+  if (prop) prop(g);
+  if (p.curativos && p.curativos.length) desenharCurativos(g, p.curativos, maos, lx, ly, bw);
+  if ((p.escudo || p.bloqueio) && co >= -0.25) desenharEscudoNoColono(g, p, maos, lx, ly, fx, fy);
   g.restore();
   g.restore();
 }
@@ -2007,6 +2053,7 @@ function desenharSpriteColono(g, c, img, x, y) {
 
 // ---------- FERRAMENTAS na mão (machado, picareta, martelo, serra, faca) ----------
 function desenharFerramenta(g, f) {
+  if (f.tipo === 'espada' || f.tipo === 'arco') return desenharArma(g, f);
   const n = Math.hypot(f.d.x, f.d.y) || 1, ux = f.d.x / n, uy = f.d.y / n, px = -uy, py = ux;
   g.lineCap = 'round'; g.lineJoin = 'round';
   const cabo = (lw, cor) => { g.beginPath(); g.moveTo(f.x0, f.y0); g.lineTo(f.x1, f.y1); g.lineWidth = lw + 1.4; g.strokeStyle = CONTORNO; g.stroke(); g.lineWidth = lw; g.strokeStyle = cor; g.stroke(); };
@@ -2040,7 +2087,8 @@ function desenharFerramenta(g, f) {
   }
 }
 // pose das mãos (e ferramenta) para cada tipo de ação de trabalho. f = fase 0..1 do ciclo
-function poseAcao(ac, lx, ly, fx, fy, co, s) {
+function poseAcao(ac, lx, ly, fx, fy, co, s, cy = 0) {
+  if (POSES[ac.tipo]) return POSES[ac.tipo](ac, { lx, ly, fx, fy, co, s, cy, atras: co < -0.25 });
   const f = ac.f, sh = { x: lx * 2.2, y: 3 + ly * 2.2 };
   const dir = th => ({ x: fx * Math.cos(th), y: fy * Math.cos(th) - Math.sin(th) * 0.95 });
   const atras = co < -0.25;
@@ -2139,6 +2187,7 @@ function desenharCamaMovel(g, x, y, cor, planta) {
 }
 // peça sendo fabricada em cima da bancada: toma forma em etapas conforme o progresso
 function desenharPecaNaBancada(g, cx, cy, tipo, frac, pulso) {
+  if (tipo !== 'MACHADO' && tipo !== 'PICARETA') return desenharPecaV8(g, cx, cy, tipo, frac, pulso);
   g.save(); g.translate(cx, cy); g.scale(1 + pulso * 0.14, 1 + pulso * 0.14);
   g.lineJoin = 'round'; g.lineCap = 'round';
   const tabua = (x, y, ang, L) => { g.save(); g.translate(x, y); g.rotate(ang); g.beginPath(); g.roundRect(-L / 2, -1.6, L, 3.2, 1); g.fillStyle = '#b07d4b'; g.fill(); g.lineWidth = 0.9; g.strokeStyle = CONTORNO; g.stroke(); g.restore(); };
@@ -2317,6 +2366,7 @@ function atualizarVisuais(dt) {
     const v = clamp((mapa.portas.get(i) || 0) + (perto ? 1 : -1) * Math.max(dt, 0.016) * 5, 0, 1);
     if (v > 0) mapa.portas.set(i, v); else mapa.portas.delete(i);
   }
+  atualizarVisuaisV8(dt);
 }
 function desenharEfeitos(g) {
   for (const p of efeitos) {
@@ -2336,6 +2386,8 @@ function desenharEfeitos(g) {
     } else if (p.tipo === 'faisca') {
       g.beginPath(); g.moveTo(x, y); g.lineTo(x - p.vx * 0.02, y - (p.vy - p.vz) * 0.02); g.lineWidth = 1.2; g.strokeStyle = '#ffd770'; g.stroke();
       circulo(g, x, y, 0.9); g.fillStyle = '#fff6c8'; g.fill();
+    } else if (p.tipo === 'sangue') {
+      circulo(g, x, y, p.tam || 1.2); g.fillStyle = '#8a1010'; g.fill();
     } else if (p.tipo === 'brilho') {
       estrela(g, x, y, 3.2 * a + 1, '#fff7c2');
     }
@@ -2649,7 +2701,7 @@ function desenharCama(g, c) { // saco de dormir (cabeceira à esquerda); some qu
 
 function render(dtR = 0) {
   const W = canvas.width, H = canvas.height;
-  const todos = personagens();
+  const todos = personagens().concat(animais);
   for (const c of todos) { // posição interpolada entre os dois últimos ticks
     const a = alphaSim;
     c.rx = lerp(c.ax ?? c.x, c.x, a); c.ry = lerp(c.ay ?? c.y, c.y, a);
@@ -2700,6 +2752,7 @@ function render(dtR = 0) {
   for (const c of colonos) desenharCama(ctx, c);
   desenharEstruturasChao(x0, y0, x1, y1);
   desenharMineracao();
+  desenharManchas(ctx);
   if (Q.sombraDinamica) desenharSombrasArvores(x0, y0, x1, y1);
 
   // caminho do colono selecionado (linha tracejada)
@@ -2751,6 +2804,7 @@ function render(dtR = 0) {
   for (const d of mapa.desig.values()) if (visivel(d.x, d.y)) iconeOrdem(ctx, d.tipo, (d.x + 0.5) * T, (d.y + 0.5) * T - (d.tipo === 'cortar' && mapa.arvore[idx(d.x, d.y)] !== ARBUSTO ? 22 : 0));
 
   for (const q of quedas) desenharQueda(ctx, q);
+  desenharCombate(ctx);
   if (estado.verTeto) desenharTeto(x0, y0, x1, y1);
   if (modo === 'plantio' && mouse.arrastoIni && mouse.tile) { // prévia da zona
     const ax = Math.min(mouse.arrastoIni.x, mouse.tile.x), ay = Math.min(mouse.arrastoIni.y, mouse.tile.y), bx = Math.max(mouse.arrastoIni.x, mouse.tile.x), by = Math.max(mouse.arrastoIni.y, mouse.tile.y);
@@ -2789,7 +2843,7 @@ function render(dtR = 0) {
   }
   for (const c of todos) {
     const wx = c.rx * T + T / 2, wy = c.ry * T + T / 2;
-    if (camera.zoom > 0.6) { const p = mundoParaTela(wx, wy + 15); rotulo(ctx, c.nome + (c.visitante ? ' (visitante)' : c.triste ? ' (triste)' : ''), p.x, p.y, c.visitante ? '#e8d48a' : c.triste ? '#9db8ff' : (c === selecionado ? '#fff' : '#ddd')); }
+    if (camera.zoom > 0.6 && !c.carregadoPor && (!c.animal || c === (inspecao && inspecao.animal) || c.cacar || c.estado === 'atacar')) { const p = mundoParaTela(wx, wy + 15); rotulo(ctx, c.nome + (c.visitante ? ' (visitante)' : c.triste ? ' (triste)' : (c.saude && c.saude.caido ? ' (caído)' : '')), p.x, p.y, c.visitante ? '#e8d48a' : c.triste ? '#9db8ff' : (c === selecionado ? '#fff' : '#ddd')); }
     const t = c.tarefa;
     if (t && t.fase === 'fazendo' && t.total) {
       const alvo = t.alvo || c, p = mundoParaTela((t.alvo ? alvo.x * T + T / 2 : wx), (t.alvo ? alvo.y * T : wy - 22));
@@ -2819,7 +2873,8 @@ function render(dtR = 0) {
       cantos(ctx, a0.x, a0.y, a1.x, a1.y, '#f4f4f4', 1.5 * k);
     }
   }
-  if (!selecionado && inspecao) {
+  if (!selecionado && inspecao && inspecao.animal) { const an = inspecao.animal, a0 = mundoParaTela(an.rx * T - 4, an.ry * T - 4), a1 = mundoParaTela(an.rx * T + T + 4, an.ry * T + T + 6); cantos(ctx, a0.x, a0.y, a1.x, a1.y, '#ffd770', 1.5 * k); }
+  else if (!selecionado && inspecao) {
     const a0 = mundoParaTela(inspecao.x * T, inspecao.y * T), a1 = mundoParaTela((inspecao.x + 1) * T, (inspecao.y + 1) * T);
     cantos(ctx, a0.x, a0.y, a1.x, a1.y, '#f4f4f4', 1.5 * k);
   }
@@ -2833,6 +2888,7 @@ function render(dtR = 0) {
   }
 }
 function desenharColonoNoMapa(c, dtR) {
+  if (c.animal) return desenharAnimal(c, dtR);
   let x = c.rx * T + T / 2, y = c.ry * T + T / 2;
   const img = SPRITES.colono.imgsPorColono[c.nome] || c.imgSheet || SPRITES.colono.img;
   // virar suave (Baixo: vira na hora, só 4 direções)
@@ -2848,6 +2904,7 @@ function desenharColonoNoMapa(c, dtR) {
     c.piscaT -= dtR; if (c.piscaT < -0.13) c.piscaT = 2 + rndVis() * 4;
     fechados = c.piscaT < 0;
   }
+  const PZ = prepararPose(c, x, y) || {}; if (PZ.feito) return;
   if (c.dormindo) {
     const resp = Math.sin(tempoReal * 1.5) * 0.4;
     if (Q.nivel > 0) { ctx.save(); ctx.font = 'bold 8px sans-serif'; ctx.textAlign = 'center'; // "z z z" subindo
@@ -2878,6 +2935,7 @@ function desenharColonoNoMapa(c, dtR) {
   const t = c.tarefa;
   let acao = null;
   if (t && t.fase === 'fazendo' && !c.visitante) { const tp = tipoAcao(c, t); if (tp) acao = { tipo: tp, f: c.rAcaoF || 0 }; }
+  if (PZ.acao) acao = PZ.acao;
   if (acao && t.alvo) { // o corpo acompanha o golpe (avança no impacto, recua ao erguer)
     const f = acao.f;
     let lunge;
@@ -2896,7 +2954,9 @@ function desenharColonoNoMapa(c, dtR) {
     let sq = 0;
     if (acao) { const A = ACOES[acao.tipo]; if (A) for (const gp of A.golpes) { const d = ((acao.f - gp) % 1 + 1) % 1; if (d < 0.12) sq = Math.max(sq, 1 - d / 0.12); } }
     if (sq && Q.nivel > 0) { ctx.save(); ctx.translate(x, y + 9); ctx.scale(1 + sq * 0.05, 1 - sq * 0.07); ctx.translate(-x, -(y + 9)); }
-    desenharColono(ctx, c, x, y, { yaw: c.yawVis, fase, w, carregando: c.carregando, fechados, mola, respira: Math.sin(tempoReal * 2 + c.x) * 0.3, acao });
+    if (PZ.antes) PZ.antes();
+    desenharColono(ctx, c, x, y, Object.assign({ yaw: c.yawVis + (PZ.dyaw || 0), fase, w, carregando: c.carregando, fechados, mola, respira: Math.sin(tempoReal * 2 + c.x) * 0.3, acao }, PZ.extra || {}, { fechados: fechados || (PZ.extra && PZ.extra.fechados) }));
+    if (PZ.depois) PZ.depois();
     if (sq && Q.nivel > 0) ctx.restore();
     if (acao && Q.nivel > 0 && (acao.tipo === 'machado' || acao.tipo === 'picareta' || acao.tipo === 'martelar')) desenharRastroGolpe(c, x, y, acao);
   }
@@ -3004,7 +3064,7 @@ function desenharSombrasArvores(x0, y0, x1, y1) {
 const teclas = {};
 const mouse = { x: 0, y: 0, tile: null, botao: -1, inicioX: 0, inicioY: 0, moveu: false, arrastoIni: null };
 let modo = null; // null | 'cortar' | 'minerar' | 'cancelar' (marcação de ordens)
-const NOME_MODO = { cortar: 'Cortar árvores', minerar: 'Minerar rocha', cancelar: 'Cancelar / desconstruir', parede_madeira: 'Parede de madeira', parede_pedra: 'Parede de pedra', cama: 'Cama', bancada: 'Bancada de trabalho', porta: 'Porta', plantio: 'Zona de plantio' };
+const NOME_MODO = { cortar: 'Cortar árvores', minerar: 'Minerar rocha', cancelar: 'Cancelar / desconstruir', parede_madeira: 'Parede de madeira', parede_pedra: 'Parede de pedra', cama: 'Cama', bancada: 'Bancada de trabalho', porta: 'Porta', plantio: 'Zona de plantio', cacar: 'Caçar animais', cacada: 'Caçada em grupo (escolha um animal)' };
 
 function telaParaMundo(cx, cy) { // coords de cliente (CSS px)
   const { ox, oy, z } = origemTela();
@@ -3037,6 +3097,7 @@ function definirModo(m) {
 }
 function aplicarOrdens(a, b) {
   if (PLANTAS[modo]) { colocarPlantas(a, b, modo); return; }
+  if (modo === 'cacar' || modo === 'cacada') return ordemCaca(a, b);
   const x0 = clamp(Math.min(a.x, b.x), 0, mapa.L - 1), x1 = clamp(Math.max(a.x, b.x), 0, mapa.L - 1);
   const y0 = clamp(Math.min(a.y, b.y), 0, mapa.A - 1), y1 = clamp(Math.max(a.y, b.y), 0, mapa.A - 1);
   let n = 0;
@@ -3067,6 +3128,8 @@ window.addEventListener('keydown', e => {
   if (e.code === 'KeyT') { estado.verTeto = !estado.verTeto; mostrarToast(`Telhado: ${estado.verTeto ? 'visível' : 'oculto'}`); return; }
   if (e.code === 'KeyK' || (e.code === 'KeyS' && (e.ctrlKey || e.metaKey))) { e.preventDefault(); salvarJogo('manual'); return; }
   if (e.code === 'KeyL') { carregarJogo('manual'); return; }
+  if (e.code === 'KeyJ') { definirModo(modo === 'cacar' ? null : 'cacar'); return; }
+  if (e.code === 'KeyU') { definirModo(modo === 'cacada' ? null : 'cacada'); return; }
   if (e.code === 'KeyX') { definirModo(modo === 'cancelar' ? null : 'cancelar'); return; }
   if (e.code === 'KeyG') { const i = ORDEM_QUALIDADE.indexOf(QUALIDADE); definirQualidade(ORDEM_QUALIDADE[(i + 1) % 3]); return; }
   if (e.code === 'KeyI') { estado.indicadores = !estado.indicadores; mostrarToast(`Indicadores sobre a cabeça: ${estado.indicadores ? 'ligados' : 'desligados'}`); return; }
@@ -3087,7 +3150,7 @@ canvas.addEventListener('mousedown', e => {
     if (modo) { mouse.arrastoIni = mouse.tile; return; }
     const c = colonoEm(e.clientX, e.clientY);
     if (c) { selecionar(c); inspecao = null; }
-    else { selecionar(null); const t = mouse.tile; inspecao = dentro(t.x, t.y) ? t : null; }
+    else { selecionar(null); const an = animalEmTela(e.clientX, e.clientY), t = mouse.tile; inspecao = an ? { x: Math.round(an.x), y: Math.round(an.y), animal: an } : dentro(t.x, t.y) ? t : null; }
   }
 });
 window.addEventListener('mousemove', e => {
@@ -3164,7 +3227,7 @@ function tocarEm(x, y) {
   if (modo) return;
   const c = colonoEm(x, y, 28);
   if (c) { selecionar(c); inspecao = null; }
-  else { selecionar(null); const t = telaParaTile(x, y); inspecao = dentro(t.x, t.y) ? t : null; }
+  else { selecionar(null); const an = animalEmTela(x, y), t = telaParaTile(x, y); inspecao = an ? { x: Math.round(an.x), y: Math.round(an.y), animal: an } : dentro(t.x, t.y) ? t : null; }
 }
 canvas.addEventListener('touchstart', e => {
   e.preventDefault();
@@ -3243,7 +3306,7 @@ document.querySelectorAll('#barra button').forEach(bt => bt.addEventListener('cl
 if (EH_TOQUE) document.body.classList.add('toque');
 
 /* ================================ UI ================================ */
-const estado = { minutos: CONFIG.HORA_INICIAL * 60, pausado: false, velocidade: 1, indicadores: true, verTeto: false, chuva: null, pedidos: [], stats: novasStats(), proximoEvento: Infinity };
+const estado = { minutos: CONFIG.HORA_INICIAL * 60, pausado: false, velocidade: 1, indicadores: true, verTeto: false, chuva: null, pedidos: [], stats: novasStats(), proximoEvento: Infinity, vento: 0.8 };
 const horaDoDia = () => (estado.minutos / 60) % 24;
 const $ = id => document.getElementById(id);
 const historico = [];
@@ -3302,7 +3365,7 @@ function montarRetratos() {
 const iconesRecurso = {};
 function montarRecursos() {
   const el = $('recursos'); el.innerHTML = '';
-  for (const tipo of ['MADEIRA', 'PEDRA', 'FRUTAS', 'MILHO']) {
+  for (const tipo of ['MADEIRA', 'PEDRA', 'FRUTAS', 'MILHO', 'CARNE', 'BANDAGEM']) {
     const sp = document.createElement('span'); sp.title = ITEM[tipo].nome + ' no estoque';
     const cv = novoCanvas(40, 40), g = cv.getContext('2d'); g.scale(1.5, 1.5);
     desenharItem(g, { tipo, qtd: 50, x: 0, y: 0 }, 13.3, 11);
@@ -3346,12 +3409,14 @@ function atualizarUI() {
       barraNec('Humor', c.humor) + barraNec('Fome', c.fome) + barraNec('Sono', c.sono) +
       `<div class="sub" style="margin:6px 0 0">Ferramentas: <span style="color:#eee">${fl}</span> · Dorme: ${c.camaPropria ? 'na própria cama' : 'em saco de dormir'}</div>` +
       `<div class="sub" style="margin:6px 0 2px">Pensamentos (base 50)</div>${pens || '<div class="pens"><span style="color:#888">Nada em especial.</span></div>'}` +
+      `<div class="sub" style="margin-top:4px">Equipamento: <span style="color:#eee">${textoEquip(c)}</span> · Saúde: <span style="color:${c.saude.feridas.length ? '#ff9a7a' : '#9c9'}">${c.saude.caido ? 'caído(a)' : c.saude.feridas.length ? c.saude.feridas.length + ' ferimento(s), dor ' + Math.round(c.saude.dor * 100) + '%' : 'saudável'}</span></div>` +
       `<div class="sub" style="margin-top:6px">Opinião: ${ops}</div>`;
+    ins.innerHTML = abaInspecao === 'saude' ? htmlSaude(c) : tabsInspecao() + ins.innerHTML;
   } else if (inspecao) {
     ins.style.display = 'block';
     const i = idx(inspecao.x, inspecao.y), it = itemEm.get(i), a = mapa.arvore[i];
     const titulo = it ? ITEM[it.tipo].nome + (it.qtd > 1 ? ' x' + it.qtd : '') : a ? ESPECIES[a - 1].nome : mapa.estrutura[i] ? PLANTAS[PLANTA_DE_ESTR[mapa.estrutura[i]]].nome : NOME_TERRENO[mapa.terreno[i]];
-    ins.innerHTML = `<h3>${titulo}</h3><div class="sub">${descreverTile(inspecao.x, inspecao.y)}</div><div class="sub">Posição (${inspecao.x}, ${inspecao.y}) · semente ${mapa.seed}</div>`;
+    if (inspecao.animal && animais.includes(inspecao.animal)) ins.innerHTML = htmlAnimal(inspecao.animal); else ins.innerHTML = `<h3>${titulo}</h3><div class="sub">${descreverTile(inspecao.x, inspecao.y)}</div><div class="sub">Posição (${inspecao.x}, ${inspecao.y}) · semente ${mapa.seed}</div>`;
   } else ins.style.display = 'none';
   const tm = $('terrenoMouse');
   tm.style.bottom = (ins.style.display === 'none' ? 36 : 31 + ins.offsetHeight + 4) + 'px';
@@ -3374,13 +3439,13 @@ function abrirAba(nome) {
   if (nome === 'arquitetar') {
     const emAndamento = mapa.bancadas.filter(b => b.fazendo).map(b => `${RECEITAS[b.fazendo].nome} ${Math.floor(b.progresso / b.total * 100)}%`);
     html = '<h4>Arquitetar — Ordens</h4>' +
-      '<span class="ordem" data-modo="cortar">🪓 Cortar árvores (C)</span><span class="ordem" data-modo="minerar">⛏ Minerar (M)</span><span class="ordem" data-modo="cancelar">✖ Cancelar / desconstruir (X)</span><span class="ordem" data-modo="plantio">🌱 Zona de plantio (P)</span>' +
+      '<span class="ordem" data-modo="cortar">🪓 Cortar árvores (C)</span><span class="ordem" data-modo="minerar">⛏ Minerar (M)</span><span class="ordem" data-modo="cancelar">✖ Cancelar / desconstruir (X)</span><span class="ordem" data-modo="plantio">🌱 Zona de plantio (P)</span><span class="ordem" data-modo="cacar">🎯 Caçar (J)</span><span class="ordem" data-modo="cacada">👥 Caçada em grupo (U)</span>' +
       '<h4 style="margin-top:10px">Estruturas e mobília</h4>' +
       Object.entries(PLANTAS).map(([k, P]) => `<span class="ordem" data-modo="${k}">${P.nome}<br><small style="color:#aaa">${textoCusto(P.custo)}</small></span>`).join('') +
       '<div class="breve" style="font-style:normal;color:#bbb">Coloque a planta (azul): os colonos levam o material e constroem. Paredes: arraste uma linha, ou um retângulo para uma sala (põe uma porta no meio do lado de baixo; sala fechada ganha telhado). X desconstrói.</div>' +
       '<h4 style="margin-top:10px">Fabricar na bancada</h4>' +
       (mapa.bancadas.length
-        ? Object.entries(RECEITAS).map(([k, R]) => `<span class="ordem" data-ped="${k}">+ ${R.nome}<br><small style="color:#aaa">${textoCusto(R.custo)}</small></span>`).join('') +
+        ? Object.entries(RECEITAS).filter(([, R]) => !R.auto).map(([k, R]) => `<span class="ordem" data-ped="${k}">+ ${R.nome}<br><small style="color:#aaa">${textoCusto(R.custo)}</small></span>`).join('') +
           `<div class="breve" style="font-style:normal;color:#bbb">Fila: ${estado.pedidos.map(p => RECEITAS[p].nome).join(', ') || 'vazia'}${emAndamento.length ? ' · fazendo: ' + emAndamento.join(', ') : ''}</div>`
         : '<div class="breve">Construa uma bancada de trabalho para fabricar machados e picaretas.</div>');
   } else if (nome === 'trabalho') {
@@ -3461,11 +3526,11 @@ function definirQualidade(q, avisar = true) {
 /* =========================== SALVAR / CARREGAR ===========================
    Tudo em JSON. Mapas (typed arrays) em base64. Slots no localStorage: 'colonia.auto' (automático) e 'colonia.salvo' (manual).
    Exportar: arquivo .json (download) ou "código" (gzip + base64) para copiar/colar entre celular e PC. */
-const VERSAO_SAVE = 7; // v7 lê saves da v6 (mesmo formato; a v7 só acrescentou espécies de árvore)
+const VERSAO_SAVE = 8; // v8: saúde, animais, armas (lê 6, 7 e 8); // v7 lê saves da v6 (mesmo formato; a v7 só acrescentou espécies de árvore)
 const CAMPOS_MAPA = ['terreno', 'arvore', 'variante', 'fase', 'toco', 'frutos', 'rebrota', 'estrutura'];
 function b64DeArray(a) { const u = new Uint8Array(a.buffer, a.byteOffset, a.byteLength); let r = ''; for (let i = 0; i < u.length; i += 0x8000) r += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(r); }
 function arrayDeB64(str, Tipo) { const bin = atob(str), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new Tipo(u.buffer); }
-const SEM_SALVAR = new Set(['tarefa', 'caminho', 'carregando', 'balao', 'camaPropria', 'imgSheet', 'rx', 'ry', 'rdist', 'rvel', 'rAcaoF']);
+const SEM_SALVAR = new Set(['tarefa', 'caminho', 'carregando', 'balao', 'camaPropria', 'imgSheet', 'rx', 'ry', 'rdist', 'rvel', 'rAcaoF', 'vis', 'anim', 'carregadoPor', 'resgatador', 'medico', 'pedeAjuda', 'agachado', 'sentado', 'deitarTrat', 'ameacaT', 'ultTile', 'chkResg']);
 function serializar() {
   const its = itens.map(it => ({ x: it.x, y: it.y, tipo: it.tipo, qtd: it.qtd }));
   for (const c of colonos) if (c.carregando) its.push({ x: Math.round(c.x), y: Math.round(c.y), tipo: c.carregando.tipo, qtd: c.carregando.qtd, solto: 1 });
@@ -3478,12 +3543,12 @@ function serializar() {
     desig: [...mapa.desig.values()], zonaTiles: mapa.zonaTiles, cultivo: [...mapa.cultivo.values()], arbustos: mapa.arbustos,
   });
   const cols = colonos.map(c => { const o = {}; for (const k in c) if (!SEM_SALVAR.has(k)) o[k] = c[k]; o.camaPropria = c.camaPropria ? { x: c.camaPropria.x, y: c.camaPropria.y } : null; return o; });
-  const e = { minutos: estado.minutos, pausado: estado.pausado, velocidade: estado.velocidade, indicadores: estado.indicadores, verTeto: estado.verTeto, chuva: estado.chuva, pedidos: estado.pedidos, stats: estado.stats, proximoEvento: estado.proximoEvento };
-  return { jogo: 'colonia', versao: VERSAO_SAVE, quando: Date.now(), dia: Math.floor(estado.minutos / 1440) + 1, rnd: rndSim.s, camera: { x: camera.x, y: camera.y, zoom: camera.zoom }, mapa: m, itens: its, colonos: cols, estado: e };
+  const e = { minutos: estado.minutos, pausado: estado.pausado, velocidade: estado.velocidade, indicadores: estado.indicadores, verTeto: estado.verTeto, chuva: estado.chuva, pedidos: estado.pedidos, stats: estado.stats, proximoEvento: estado.proximoEvento, vento: estado.vento };
+  return { jogo: 'colonia', versao: VERSAO_SAVE, quando: Date.now(), dia: Math.floor(estado.minutos / 1440) + 1, rnd: rndSim.s, camera: { x: camera.x, y: camera.y, zoom: camera.zoom }, mapa: m, itens: its, colonos: cols, estado: e, animais: serializarV8() };
 }
 function validarSave(d) {
   if (!d || d.jogo !== 'colonia') throw new Error('isto não é um save da Colônia');
-  if (d.versao !== VERSAO_SAVE && d.versao !== 6) throw new Error(`versão do save ${d.versao} (este jogo lê 6 e ${VERSAO_SAVE})`);
+  if (![6, 7, VERSAO_SAVE].includes(d.versao)) throw new Error(`versão do save ${d.versao} (este jogo lê 6, 7 e ${VERSAO_SAVE})`);
   if (!d.mapa || !Array.isArray(d.colonos) || !Array.isArray(d.itens)) throw new Error('save incompleto');
 }
 function aplicarSave(d) {
@@ -3515,6 +3580,7 @@ function aplicarSave(d) {
   calcularRegioes(); calcularTelhado(false);
   mapa.canvasChao = renderizarChao();
   horaAnterior = horaDoDia();
+  aplicarSaveV8(d);
   $('pausado').style.display = estado.pausado ? 'block' : 'none'; marcarVel();
   selecionar(colonos[0]);
 }
@@ -3552,19 +3618,19 @@ async function codigoDoSave() { // "C6:" + gzip base64 (ou "J6:" + base64 do JSO
   const txt = JSON.stringify(serializar());
   if (typeof CompressionStream === 'function') {
     const buf = await new Response(new Blob([txt]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer();
-    return 'C7:' + b64DeArray(new Uint8Array(buf));
+    return 'C8:' + b64DeArray(new Uint8Array(buf));
   }
-  return 'J7:' + btoa(unescape(encodeURIComponent(txt)));
+  return 'J8:' + btoa(unescape(encodeURIComponent(txt)));
 }
 async function saveDeTexto(t) {
   t = (t || '').trim();
   if (t.startsWith('{')) return JSON.parse(t);
-  if (t.startsWith('C6:') || t.startsWith('C7:')) {
+  if (/^C[678]:/.test(t)) {
     if (typeof DecompressionStream !== 'function') throw new Error('este navegador não descompacta códigos; use o arquivo .json');
     const u = arrayDeB64(t.slice(3).replace(/\s+/g, ''), Uint8Array);
     return JSON.parse(await new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream('gzip'))).text());
   }
-  if (t.startsWith('J6:') || t.startsWith('J7:')) return JSON.parse(decodeURIComponent(escape(atob(t.slice(3).replace(/\s+/g, '')))));
+  if (/^J[678]:/.test(t)) return JSON.parse(decodeURIComponent(escape(atob(t.slice(3).replace(/\s+/g, '')))));
   if (/^[CJ]\d+:/.test(t)) throw new Error(`código de outra versão (${t.slice(0, 2)})`);
   throw new Error('texto não reconhecido');
 }
@@ -3587,6 +3653,1407 @@ setInterval(() => { if (colonos.length) salvarJogo('auto', true); }, 120000);
 addEventListener('pagehide', () => salvarJogo('auto', true));
 document.addEventListener('visibilitychange', () => { if (document.hidden) salvarJogo('auto', true); });
 
+/* =====================================================================
+   v8 — SAÚDE · TRATAMENTO · RESGATE · ANIMAIS · ARMAS · CAÇADA EM GRUPO
+   Tudo que é simulação usa rnd() (semente do jogo); efeitos visuais usam rndVis().
+   ===================================================================== */
+const PARTES = {
+  cabeca: { nome: 'Cabeça', g: 'cabeca' }, pescoco: { nome: 'Pescoço', g: 'cabeca' }, torso: { nome: 'Torso', g: 'torso' },
+  bracoE: { nome: 'Braço esquerdo', g: 'braco', lado: -1 }, bracoD: { nome: 'Braço direito', g: 'braco', lado: 1 },
+  maoE: { nome: 'Mão esquerda', g: 'mao', lado: -1 }, maoD: { nome: 'Mão direita', g: 'mao', lado: 1 },
+  pernaE: { nome: 'Perna esquerda', g: 'perna', lado: -1 }, pernaD: { nome: 'Perna direita', g: 'perna', lado: 1 },
+  peE: { nome: 'Pé esquerdo', g: 'pe', lado: -1 }, peD: { nome: 'Pé direito', g: 'pe', lado: 1 },
+};
+const FERIDA = { contusao: { nome: 'Contusão', dor: 0.16 }, corte: { nome: 'Corte', dor: 0.26 }, mordida: { nome: 'Mordida', dor: 0.3 }, fratura: { nome: 'Fratura', dor: 0.5 } };
+const SANGRA = { leve: 4, medio: 10, forte: 22 }; // pontos de sangue por hora
+const novaSaude = () => ({ feridas: [], sangue: 100, dor: 0, caido: false, inconsciente: false, prox: 0 });
+function saude(c) { if (!c.saude) c.saude = novaSaude(); return c.saude; }
+const nivelSangra = f => f.sangra <= 0 ? '' : f.sangra >= 18 ? 'forte' : f.sangra >= 8 ? 'médio' : 'leve';
+const corta = tipo => tipo === 'corte' || tipo === 'mordida';
+function visDe(c) { if (!c.vis) c.vis = { careta: 0, golpe: 0, bloqueio: 0, gota: 0 }; return c.vis; }
+
+function ferir(c, parte, tipo, sev, origem) {
+  const s = saude(c); sev = clamp(sev, 0.05, 1);
+  const f = { id: ++s.prox, parte, tipo, sev, sev0: sev, sangra: corta(tipo) ? (sev < 0.35 ? SANGRA.leve : sev < 0.6 ? SANGRA.medio : SANGRA.forte) : 0,
+              trat: 0, idade: 0, infec: 0, infTrat: 0, infT: 0, limpo: false, band: false, tala: false, pressionado: false };
+  s.feridas.push(f); estado.stats.feridas++;
+  const v = visDe(c); v.careta = 1; v.golpe = 0.3;
+  respingo(c.x, c.y, corta(tipo) ? 1 : 0.35);
+  log(`${c.nome}: ${FERIDA[tipo].nome.toLowerCase()} — ${PARTES[parte].nome.toLowerCase()}${origem ? ' (' + origem + ')' : ''}${f.sangra ? ', sangramento ' + nivelSangra(f) : ''}.`, 'ruim');
+  recalcularSaude(c);
+  return f;
+}
+function recalcularSaude(c) {
+  const s = saude(c); let dor = 0, inf = 0;
+  for (const f of s.feridas) { dor += FERIDA[f.tipo].dor * f.sev * (f.trat ? 0.55 : 1) * (f.tala ? 0.6 : 1) + 0.45 * f.infec; inf = Math.max(inf, f.infec); }
+  s.dor = clamp(dor, 0, 1);
+  s.inconsciente = s.sangue < 30 || s.dor > 0.95;
+  const cai = s.sangue < 40 || s.dor >= 0.85 || inf >= 0.95;
+  if (!s.caido && cai) cair(c);
+  else if (s.caido && !cai && s.sangue >= 48 && s.dor < 0.72) levantarDoChao(c);
+}
+function cair(c) {
+  const s = saude(c); s.caido = true;
+  cancelar(c); c.vel = 0; c.caminho = []; c.agachado = false;
+  c.anim = { tipo: 'desmaiar', t: 0, dur: 0.8 }; contarAnim('desmaiar');
+  estado.stats.desmaios++;
+  log(`${c.nome} desabou${s.inconsciente ? ' inconsciente' : ''} (${s.sangue < 40 ? 'perdeu muito sangue' : 'dor demais'})!`, 'ruim');
+  if (estado.stats.desmaios <= 3) carta(`${c.nome} caiu`, `${c.nome} está caído(a) e não consegue se mexer.\n\nUm colono com a prioridade Médico vai resgatá-lo(a) até uma cama e tratar os ferimentos. Bandagens (feitas na bancada) dão um tratamento muito melhor.`, 'ruim');
+}
+function levantarDoChao(c) {
+  const s = saude(c); s.caido = false;
+  if (c.carregadoPor) return;
+  if (c.tarefa && c.tarefa.tipo === 'repousar') return; // continua repousando
+  c.anim = { tipo: 'levantar', t: 0, dur: 1.3 }; contarAnim('levantar');
+  c.tarefa = null; c.caminho = [];
+  log(`${c.nome} recuperou os sentidos e se levanta.`, 'bom');
+}
+const contarAnim = an => { estado.stats.anims[an] = (estado.stats.anims[an] || 0) + 1; };
+
+function atualizarSaude(c, horas) {
+  const s = saude(c);
+  if (!s.feridas.length && s.sangue >= 100) { if (s.dor) s.dor = 0; if (s.caido) recalcularSaude(c); return; }
+  const t = c.tarefa, repouso = t && t.tipo === 'repousar' && t.fase === 'deitado', camaReal = repouso && t.camaReal;
+  let sangraTot = 0;
+  for (const f of s.feridas) {
+    f.idade += horas * 60;
+    if (f.sangra > 0) { sangraTot += f.sangra; f.sangra = Math.max(0, f.sangra - horas * (f.sangra < 8 ? 1.4 : s.caido || repouso ? 1.1 : 0.45)); } // leve coagula logo; médio/forte bem devagar (mais rápido deitado) // sangramento leve coagula sozinho
+    if (corta(f.tipo) && !f.infec && !f.infCurada && f.idade > 180 && f.trat < 0.5) {
+      if (rnd() < (f.limpo ? 0.012 : f.trat ? 0.02 : 0.05) * horas) { f.infec = 0.06; estado.stats.infeccoes++; log(`A ferida (${PARTES[f.parte].nome.toLowerCase()}) de ${c.nome} infeccionou!`, 'ruim'); }
+    }
+    if (f.infec > 0) {
+      f.imune = (f.imune || 0) + horas * (repouso || s.caido ? 0.0016 : 0.0011); // o corpo reage aos poucos
+      f.infec = clamp(f.infec + (0.028 - 0.062 * f.infTrat - f.imune) * horas, 0, 1); // tratamento fraco mal segura; sem tratamento piora
+      if (f.infec <= 0) { f.infCurada = true; f.infTrat = 0; estado.stats.infeccoesCuradas++; log(`A infecção de ${c.nome} sarou.`, 'bom'); }
+    } else f.sev -= 0.014 * (1 + 2 * f.trat) * (camaReal ? 1.7 : repouso ? 1.3 : 1) * (f.tipo === 'fratura' && !f.tala ? 0.15 : 1) * horas;
+  }
+  const n0 = s.feridas.length;
+  s.feridas = s.feridas.filter(f => f.sev > 0.02 || f.infec > 0);
+  if (s.feridas.length < n0) { estado.stats.curadas += n0 - s.feridas.length; if (!s.feridas.length) log(`${c.nome} está curado(a).`, 'bom'); }
+  s.sangue = clamp(s.sangue - sangraTot * horas + (sangraTot ? 0 : 3 * horas), 12, 100);
+  recalcularSaude(c);
+}
+function piorEm(c, grupos) {
+  let w = 0, f0 = null;
+  if (c.saude) for (const f of c.saude.feridas) if (grupos.includes(PARTES[f.parte].g)) {
+    const v = f.sev * (f.tipo === 'fratura' ? (f.tala ? 0.7 : 1.1) : 0.6) * (f.trat ? 0.75 : 1) + f.infec * 0.3;
+    if (v > w) { w = v; f0 = f; }
+  }
+  return { w, f: f0 };
+}
+const fatorMov = c => !c.saude || !c.saude.feridas.length ? 1 : clamp(1 - 0.6 * piorEm(c, ['perna', 'pe']).w, 0.3, 1) * (1 - 0.25 * c.saude.dor);
+const fatorTrab = c => !c.saude || !c.saude.feridas.length ? 1 : clamp(1 - 0.5 * piorEm(c, ['braco', 'mao']).w, 0.4, 1) * (1 - 0.2 * c.saude.dor);
+const infecPede = f => f.infec > 0 && (!f.infTrat || (f.infTrat < 0.6 && agora() - f.infT > 360));
+const feridaPede = f => infecPede(f) || (!f.trat && (f.sangra > 0 || f.tipo !== 'contusao' || f.sev > 0.3));
+const precisaTratar = c => !!c.saude && c.saude.feridas.some(feridaPede);
+const PRIO_FERIDA = f => (f.sangra >= 18 ? 0 : infecPede(f) ? 1 : f.sangra > 0 ? 2 : f.tipo === 'fratura' ? 3 : 4) - f.sev * 0.5;
+
+// ---- escolha do tratamento (cada um tem uma animação própria) ----
+const GRUPO_TRAT = { cabeca: 'tratarCabeca', torso: 'tratarTorso', braco: 'tratarBraco', mao: 'tratarMao', perna: 'tratarPerna', pe: 'tratarPe' };
+const GRUPO_BAND = { cabeca: 'bandagemCabeca', torso: 'bandagemTorso', braco: 'bandagemBraco', mao: 'bandagemBraco', perna: 'bandagemPerna', pe: 'bandagemPerna' };
+const NOME_TRAT = { tratarPerna: 'trata a perna', tratarPe: 'trata o pé', tratarBraco: 'trata o braço', tratarMao: 'trata a mão', tratarCabeca: 'trata a cabeça', tratarTorso: 'trata o torso',
+  bandagemPerna: 'enfaixa a perna', bandagemBraco: 'enfaixa o braço', bandagemCabeca: 'enfaixa a cabeça', bandagemTorso: 'enfaixa o torso', talaPerna: 'imobiliza a perna (tala)', talaBraco: 'imobiliza o braço (tala)',
+  pressionar: 'pressiona o sangramento', limpar: 'limpa e desinfeta a ferida', tratarInfeccao: 'trata a infecção', examinar: 'examina (pulso)', ajudarSentar: 'ajuda a sentar', tratarNaCama: 'cuida na cama' };
+const DUR_TRAT = { pressionar: 24, limpar: 16, tratarInfeccao: 34, examinar: 12, ajudarSentar: 14, tratarNaCama: 26, talaPerna: 40, talaBraco: 36,
+  bandagemPerna: 30, bandagemBraco: 28, bandagemCabeca: 30, bandagemTorso: 32 };
+function escolherTratamento(p, f, temBand) {
+  const g = PARTES[f.parte].g;
+  if (infecPede(f)) return 'tratarInfeccao';
+  if (f.sangra >= 18 && !f.pressionado) return 'pressionar';
+  if (f.tipo === 'fratura' && !f.tala) return g === 'perna' || g === 'pe' ? 'talaPerna' : 'talaBraco';
+  if (corta(f.tipo) && !f.limpo) return 'limpar';
+  if (f.tipo !== 'contusao' && temBand) return GRUPO_BAND[g];
+  if (pacienteNaCama(p) && f.tipo === 'contusao') return 'tratarNaCama';
+  return GRUPO_TRAT[g];
+}
+function aplicarTratamento(m, p, f, an) {
+  const usa = () => { if (m.bandagens > 0) { m.bandagens--; estado.stats.bandagensUsadas++; return true; } return false; };
+  estado.stats.tratamentos++;
+  if (an === 'examinar') { saude(p).examinado = agora(); return; }
+  if (an === 'ajudarSentar') { p.sentado = true; return; }
+  if (!f) return;
+  if (an === 'pressionar') { f.pressionado = true; f.sangra = Math.min(f.sangra, 6); }
+  else if (an === 'limpar') f.limpo = true;
+  else if (an === 'tratarInfeccao') { f.infTrat = usa() ? 0.85 + rnd() * 0.1 : 0.4 + rnd() * 0.12; f.infT = agora(); estado.stats.infeccoesTratadas++; }
+  else if (an.startsWith('tala')) { f.tala = true; f.band = usa(); f.trat = f.band ? 0.85 : 0.55; }
+  else if (an.startsWith('bandagem')) { f.band = usa(); f.trat = f.band ? 0.8 + rnd() * 0.15 : 0.4; f.sangra = 0; }
+  else { f.trat = Math.max(f.trat, 0.35 + rnd() * 0.12); f.sangra = 0; }
+  recalcularSaude(p);
+}
+const pacienteNaCama = p => !!(p.tarefa && p.tarefa.tipo === 'repousar' && p.tarefa.fase === 'deitado' && p.tarefa.camaReal);
+const pacienteDeitado = p => !!(saude(p).caido || (p.tarefa && p.tarefa.tipo === 'repousar' && p.tarefa.fase === 'deitado'));
+const ocupaCama = q => !!(q && (q.carregadoPor || q.resgatador || (q.tarefa && ['repousar', 'apoiado', 'esperarAjuda'].includes(q.tarefa.tipo))));
+function escolherCama(p) {
+  const livre = b => !b.paciente || b.paciente === p || !ocupaCama(b.paciente);
+  const semDono = b => !b.dono || b.dono === p || !(b.dono.dormindo && b.dono.naCama);
+  const b = (p.camaPropria && livre(p.camaPropria)) ? p.camaPropria : mapa.camas.find(b => livre(b) && semDono(b));
+  if (b) { b.paciente = p; return { x: b.x, y: b.y, real: true, ref: b }; }
+  return { x: p.cama.x, y: p.cama.y, real: false };
+}
+function deitarNaCama(p, cama) {
+  p.x = p.ax = cama.x; p.y = p.ay = cama.y; p.caminho = []; p.vel = p.avel = 0;
+  p.tarefa = { tipo: 'repousar', fase: 'deitado', cama, camaReal: cama.real, desde: agora() };
+  p.anim = { tipo: 'deitar', t: 0, dur: 0.6, naCama: cama.real }; p.sentado = false; p.yawAlvo = 0;
+}
+function querRepousar(c) {
+  const s = c.saude; if (!s || s.caido || !s.feridas.length || (c.saiuCama || -1e9) > agora() - 90) return false;
+  return s.dor > 0.4 || fatorMov(c) < 0.7 || s.sangue < 60 || s.feridas.some(f => f.infec > 0.3);
+}
+function iniciarRepouso(c) {
+  const cama = escolherCama(c);
+  const ajudante = colonos.some(o => o !== c && o.prioridades.medico && !saude(o).caido);
+  if (fatorMov(c) < 0.65 && ajudante) { c.pedeAjuda = true; c.tarefa = { tipo: 'esperarAjuda', ate: agora() + 45, cama }; c.caminho = []; log(`${c.nome} está mancando e pede ajuda para chegar à cama.`); return; }
+  const s = tileDe(c), cam = aEstrela(s.x, s.y, cama.x, cama.y);
+  c.tarefa = { tipo: 'repousar', fase: 'indo', cama, camaReal: cama.real }; c.caminho = cam || [];
+}
+/* ------------------------------ ANIMAIS ------------------------------ */
+const ESP_ANIMAL = {
+  veado: { nome: 'Veado', hp: 32, anda: 0.4, corre: 1.4, visao: 7, passo: 1.1, L: 15, W: 5.2, cor: '#a8794a', escuro: '#7d5532', claro: '#e9d9bf', carc: 'CARC_VEADO', cd: 9 },
+  lobo:  { nome: 'Lobo', hp: 42, anda: 0.55, corre: 1.3, visao: 9, passo: 1.0, L: 14, W: 4.6, cor: '#7f8186', escuro: '#55575c', claro: '#c9cacc', carc: 'CARC_LOBO', cd: 1.8 },
+  urso:  { nome: 'Urso', hp: 120, anda: 0.35, corre: 1.12, visao: 6, passo: 1.4, L: 21, W: 8.5, cor: '#5c3e27', escuro: '#3d2817', claro: '#8a6a4c', carc: 'CARC_URSO', cd: 1.9 },
+};
+const animais = [], projeteis = [], cacadas = [], flechasChao = [], manchas = [];
+let idAnimal = 0, idCacada = 0, idBando = 0;
+const seres = () => colonos.concat(visitantes, animais);
+const noite = () => { const h = horaDoDia(); return h >= 20 || h < 5; };
+function vento() { const a = estado.vento || 0; return { x: Math.cos(a), y: Math.sin(a) }; }
+const SETA_VENTO = a => '→↘↓↙←↖↑↗'[((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8];
+function criarAnimal(esp, x, y, extra = {}) {
+  const E = ESP_ANIMAL[esp];
+  const a = Object.assign({ animal: true, id: ++idAnimal, esp, nome: E.nome, x, y, ax: x, ay: y, dist: 0, adist: 0, vel: 0, avel: 0, yawAlvo: rnd() * 6.28, yawVis: 0, caminho: [],
+    hp: E.hp, estado: esp === 'veado' ? 'pastar' : 'vagar', t: 0, pensar: rnd() * 2, cd: 0, atk: 0, alerta: 0, stamina: 1, casa: { x, y }, morto: false, acaoF: 0, aAcaoF: 0,
+    chifre: esp === 'veado' && rnd() < 0.5, mola: { y: 0, v: 0 } }, extra);
+  animais.push(a); return a;
+}
+function regiaoColonia() { const c = colonos.find(c => !saude(c).caido) || colonos[0]; return mapa.regiao[idx(Math.round(c.x), Math.round(c.y))]; }
+function lugarLonge(minD, borda) {
+  const reg = regiaoColonia(), cx = mapa.L >> 1, cy = mapa.A >> 1;
+  for (let k = 0; k < 400; k++) {
+    let x, y;
+    if (borda) { const s = Math.floor(rnd() * 4), u = Math.floor(rnd() * mapa.L); [x, y] = [[u, 1], [u, mapa.A - 2], [1, u], [mapa.L - 2, u]][s]; }
+    else { x = 2 + Math.floor(rnd() * (mapa.L - 4)); y = 2 + Math.floor(rnd() * (mapa.A - 4)); }
+    if (!chaoFirme(x, y) || mapa.regiao[idx(x, y)] !== reg) continue;
+    if (colonos.some(c => Math.hypot(c.x - x, c.y - y) < minD) && k < 380) continue;
+    if (Math.hypot(x - cx, y - cy) < minD * 0.7 && k < 380) continue;
+    return { x, y };
+  }
+  return null;
+}
+function grupoAnimais(esp, n, minD, borda, extra = {}) {
+  const p = lugarLonge(minD, borda); if (!p) return [];
+  const b = ++idBando, l = [];
+  for (let k = 0; k < n; k++) {
+    let q = p;
+    for (let t = 0; t < 20; t++) { const x = p.x + Math.floor(rnd() * 5) - 2, y = p.y + Math.floor(rnd() * 5) - 2; if (chaoFirme(x, y) && mapa.regiao[idx(x, y)] === mapa.regiao[idx(p.x, p.y)]) { q = { x, y }; break; } }
+    l.push(criarAnimal(esp, q.x, q.y, { bando: b, ...extra }));
+  }
+  return l;
+}
+function povoarAnimais() {
+  animais.length = projeteis.length = cacadas.length = flechasChao.length = manchas.length = 0;
+  grupoAnimais('veado', 3, 16, false); grupoAnimais('veado', 2, 16, false);
+  grupoAnimais('urso', 1, 30, false);
+}
+function removerAnimal(a) { const k = animais.indexOf(a); if (k >= 0) animais.splice(k, 1); for (const c of colonos) if (c.tarefa && c.tarefa.presa === a) fim(c); }
+function caminhoAte(a, x, y, adj) { const s = { x: Math.round(a.x), y: Math.round(a.y) }; return aEstrela(s.x, s.y, x, y, adj, 6000); }
+function fugirDe(a, de, dist) {
+  const dx = a.x - de.x, dy = a.y - de.y, d = Math.hypot(dx, dy) || 1;
+  for (let k = 0; k < 8; k++) {
+    const ang = Math.atan2(dy, dx) + (k ? (rnd() - 0.5) * 1.6 : 0), r = dist * (k < 4 ? 1 : 0.6);
+    const x = clamp(Math.round(a.x + Math.cos(ang) * r), 1, mapa.L - 2), y = clamp(Math.round(a.y + Math.sin(ang) * r), 1, mapa.A - 2);
+    if (!chaoFirme(x, y)) continue;
+    const cam = caminhoAte(a, x, y, false); if (cam && cam.length) return cam;
+  }
+  return null;
+}
+function coberto(c, a) { // árvore, arbusto, rocha ou parede entre o colono e o animal (bem do lado do colono)
+  const dx = a.x - c.x, dy = a.y - c.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d;
+  for (const [ox, oy] of [[ux, uy], [ux * 1.4 + uy * 0.6, uy * 1.4 - ux * 0.6], [ux * 1.4 - uy * 0.6, uy * 1.4 + ux * 0.6]]) {
+    const x = Math.round(c.x + ox), y = Math.round(c.y + oy); if (!dentro(x, y)) continue;
+    const i = idx(x, y); if (mapa.arvore[i] || mapa.terreno[i] === TERRENO.ROCHA || mapa.estrutura[i] === ESTR.PAREDE_MADEIRA || mapa.estrutura[i] === ESTR.PAREDE_PEDRA) return true;
+  }
+  return false;
+}
+function linhaDeVisao(c, a) {
+  const d = Math.hypot(a.x - c.x, a.y - c.y), n = Math.ceil(d * 2);
+  for (let k = 1; k < n; k++) { const x = Math.round(lerp(c.x, a.x, k / n)), y = Math.round(lerp(c.y, a.y, k / n)), i = idx(x, y); if (mapa.terreno[i] === TERRENO.ROCHA || (mapa.estrutura[i] && mapa.estrutura[i] !== ESTR.CAMA && mapa.estrutura[i] !== ESTR.BANCADA && mapa.estrutura[i] !== ESTR.PORTA)) return false; }
+  return true;
+}
+// percepção: visão (distância, agachado, cobertura, noite) + faro (colono a favor do vento)
+function perceber(a, dt) {
+  const E = ESP_ANIMAL[a.esp], w = vento();
+  let soma = 0, quem = null, mx = 0;
+  for (const c of colonos) {
+    if (saude(c).caido || c.carregadoPor) continue;
+    const dx = c.x - a.x, dy = c.y - a.y, d = Math.hypot(dx, dy);
+    if (d > 14) continue;
+    let vis = clamp(1 - d / E.visao, 0, 1) * 1.3;
+    if (c.agachado) vis *= 0.3; if (vis && coberto(c, a)) vis *= 0.25; if (noite()) vis *= 0.6; if (c.vel > 2.5) vis *= 1.4;
+    if (c.dormindo) vis *= 0.5;
+    const cheiro = ((-dx * w.x - dy * w.y) / (d || 1) > 0.35 && d < 12) ? 0.45 * (1 - d / 12) : 0; // animal está a favor do vento do colono: sente o cheiro
+    const v = vis + cheiro; soma += v; if (v > mx) { mx = v; quem = c; }
+  }
+  a.alerta = clamp(a.alerta + (soma * 1.1 - 0.3) * dt, 0, 1.5);
+  if (quem) a.suspeito = quem;
+  return a.alerta >= 1 ? a.suspeito : null;
+}
+function alvoMaisPerto(a, raio) {
+  let m = null, md = raio;
+  for (const c of colonos) { if (saude(c).caido || c.carregadoPor) continue; const d = Math.hypot(c.x - a.x, c.y - a.y); if (d < md) { md = d; m = c; } }
+  return m;
+}
+function atacar(a, c, motivo) {
+  if (a.estado === 'atacar' && a.alvo === c) return;
+  a.estado = 'atacar'; a.alvo = c; a.caminho = []; a.pensar = 0;
+  if (motivo) log(motivo, 'ruim');
+}
+function atualizarAnimal(a, dt) {
+  const E = ESP_ANIMAL[a.esp];
+  if (a.morto) { a.t += dt; if (a.t > 1.6) { removerAnimal(a); largarItem(Math.round(a.x), Math.round(a.y), E.carc, 1); } return; }
+  a.cd -= dt; a.pensar -= dt; a.t += dt;
+  a.stamina = Math.min(1, a.stamina + dt * 0.04);
+  const viu = perceber(a, dt);
+  let lento = E.anda;
+  // fuga quando muito ferido (predadores) ou partida do mapa
+  if (a.esp !== 'veado' && a.estado !== 'partir' && a.hp < E.hp * (a.esp === 'urso' ? 0.25 : 0.35)) { a.estado = 'partir'; a.caminho = []; log(`O ${E.nome.toLowerCase()} ferido foge!`, 'bom'); }
+  if (a.ate && agora() > a.ate && a.estado !== 'partir' && a.estado !== 'atacar') { a.estado = 'partir'; a.caminho = []; }
+  if (a.estado === 'partir') {
+    lento = E.corre * 0.9;
+    if (!a.caminho.length) {
+      if (a.saindo) { removerAnimal(a); return; }
+      const b = lugarLonge(0, true); const cam = b && caminhoAte(a, b.x, b.y, false);
+      if (cam) { a.caminho = cam; a.saindo = true; } else { removerAnimal(a); return; }
+    }
+  } else if (a.esp === 'veado') {
+    if (viu && a.estado !== 'fugir' && a.stamina > 0.2) {
+      const cam = fugirDe(a, viu, 9 + a.stamina * 5);
+      if (cam) { a.estado = 'fugir'; a.caminho = cam; a.stamina -= 0.28; a.alerta = 0.6; }
+    }
+    if (a.estado === 'fugir') { lento = E.corre * (0.65 + 0.35 * a.stamina); if (!a.caminho.length) { a.estado = 'vagar'; a.pensar = 1 + rnd() * 2; } }
+    else if (a.estado === 'pastar') { if (a.pensar <= 0) { a.estado = 'vagar'; a.pensar = 0; } }
+    else if (!a.caminho.length && a.pensar <= 0) {
+      if (rnd() < 0.55) { a.estado = 'pastar'; a.pensar = 3 + rnd() * 6; }
+      else { const x = Math.round(a.x) + Math.floor(rnd() * 9) - 4, y = Math.round(a.y) + Math.floor(rnd() * 9) - 4; if (chaoFirme(x, y)) a.caminho = caminhoAte(a, x, y, false) || []; a.pensar = 2; }
+    }
+  } else { // lobo / urso
+    if (a.estado !== 'atacar') {
+      if (a.esp === 'lobo' && (a.caca && noite() || a.forcado)) { const c = alvoMaisPerto(a, 45); if (c) for (const o of animais) if (o.bando === a.bando && !o.morto && o.estado !== 'partir') atacar(o, c, o === a ? `Os lobos estão caçando ${c.nome}!` : null); }
+      else if (a.esp === 'urso') { const c = alvoMaisPerto(a, 3.5); if (c && (viu || Math.hypot(c.x - a.x, c.y - a.y) < 2.2)) atacar(a, c, `Um urso ataca ${c.nome}: entrou no território dele!`); }
+      else if (viu && a.esp === 'lobo' && a.cacado) atacar(a, viu, null);
+    }
+    if (a.estado === 'atacar') {
+      const c = a.alvo;
+      const longeCasa = a.esp === 'urso' && Math.hypot(a.x - a.casa.x, a.y - a.casa.y) > 11 && !a.cacado;
+      if (!c || !colonos.includes(c) || saude(c).caido || c.carregadoPor || longeCasa) {
+        const outro = a.esp === 'lobo' && !longeCasa ? alvoMaisPerto(a, 20) : null;
+        if (outro) a.alvo = outro; else if (a.esp === 'lobo' && c && saude(c).caido) { a.estado = 'partir'; a.alvo = null; a.caminho = []; log('Os lobos se afastam, satisfeitos por ora.'); } else { a.estado = 'vagar'; a.alvo = null; a.forcado = false; a.caminho = []; if (a.esp === 'urso') a.caminho = caminhoAte(a, a.casa.x, a.casa.y, false) || []; }
+      } else {
+        const d = Math.hypot(c.x - a.x, c.y - a.y);
+        if (a.atk > 0) { // golpe em andamento
+          const a0 = a.atk; a.atk += dt / 0.5; lento = 0; a.caminho = [];
+          if (a0 < 0.55 && a.atk >= 0.55 && d < 1.9) golpeAnimal(a, c);
+          if (a.atk >= 1) a.atk = 0;
+        } else if (d > 1.55) {
+          lento = E.corre;
+          if (a.pensar <= 0 || !a.caminho.length) { a.pensar = 0.5; const cam = caminhoAte(a, Math.round(c.x), Math.round(c.y), true); a.caminho = cam || [];
+            a.semCam = cam ? 0 : (a.semCam || 0) + 1;
+            if (a.semCam > 6) { a.semCam = 0; a.alvo = null; a.forcado = false; a.estado = a.esp === 'lobo' ? 'partir' : 'vagar'; a.inalc = agora() + 120; } } // não alcança: desiste
+        } else { a.caminho = []; lento = 0; a.yawAlvo = Math.atan2(c.x - a.x, c.y - a.y); if (a.cd <= 0) { a.cd = E.cd; a.atk = 0.001; } }
+      }
+    } else if (!a.caminho.length && a.pensar <= 0) { // vaga perto da casa / do líder
+      const lid = animais.find(o => o.bando === a.bando && !o.morto) || a, base = a.esp === 'urso' ? a.casa : lid === a ? a : lid;
+      const x = Math.round(base.x) + Math.floor(rnd() * 9) - 4, y = Math.round(base.y) + Math.floor(rnd() * 9) - 4;
+      if (chaoFirme(x, y)) a.caminho = caminhoAte(a, x, y, false) || [];
+      a.pensar = 2 + rnd() * 4;
+    }
+  }
+  if (lento > 0 || a.caminho.length) mover(a, dt, lento || E.anda); else { a.vel = Math.max(0, a.vel - dt * 20); a.andando = false; }
+}
+function golpeAnimal(a, c) {
+  const v = visDe(c);
+  if (c.escudo && rnd() < 0.42) { v.bloqueio = 0.5; estado.stats.bloqueios++; faiscasEscudo(c, a); return; }
+  if (rnd() > (a.esp === 'urso' ? 0.7 : 0.55)) return; // errou
+  estado.stats.ataques++;
+  const tab = a.esp === 'urso' ? [['torso', 4], ['cabeca', 1.4], ['bracoE', 2], ['bracoD', 2], ['pernaE', 1.5], ['pernaD', 1.5], ['maoE', 1], ['maoD', 1]]
+    : [['pernaE', 3], ['pernaD', 3], ['peE', 1.6], ['peD', 1.6], ['bracoE', 2], ['bracoD', 2], ['maoE', 1], ['maoD', 1], ['torso', 1.8], ['pescoco', 0.4]];
+  let r = rnd() * tab.reduce((s, x) => s + x[1], 0), parte = tab[0][0];
+  for (const [p, w] of tab) { if ((r -= w) <= 0) { parte = p; break; } }
+  const q = rnd(), membro = !['torso', 'cabeca', 'pescoco'].includes(parte);
+  let tipo, sev;
+  if (a.esp === 'urso') { if (q < 0.5) { tipo = 'corte'; sev = 0.4 + rnd() * 0.45; } else if (q < 0.75 && membro) { tipo = 'fratura'; sev = 0.45 + rnd() * 0.35; } else { tipo = 'contusao'; sev = 0.3 + rnd() * 0.4; } }
+  else { if (q < 0.68) { tipo = 'mordida'; sev = 0.2 + rnd() * 0.42; } else if (q < 0.93 || !membro) { tipo = 'contusao'; sev = 0.2 + rnd() * 0.3; } else { tipo = 'fratura'; sev = 0.4 + rnd() * 0.3; } }
+  ferir(c, parte, tipo, sev, a.nome.toLowerCase());
+}
+/* ------------------------------ ARMAS E LUTA ------------------------------ */
+const ARMAS = { espada: { nome: 'Espada', dano: 15, anim: 'espada' }, arco: { nome: 'Arco', dano: 13, anim: 'arco', distancia: 7.5 } };
+function animArma(c) {
+  if (c.arma === 'arco' && c.flechas > 0) return 'arco';
+  if (c.arma === 'espada') return 'espada';
+  if (c.ferramentas && c.ferramentas.machado) return 'machado';
+  if (c.ferramentas && c.ferramentas.picareta) return 'picareta';
+  return 'socar';
+}
+const DANO_ANIM = { espada: 15, machado: 11, picareta: 9, socar: 4 };
+function lutar(c, a, extra = {}) {
+  if (c.tarefa && c.tarefa.tipo === 'lutar' && c.tarefa.presa === a) return;
+  cancelar(c); c.agachado = false;
+  c.tarefa = Object.assign({ tipo: 'lutar', presa: a, fase: 'indo', rp: 0, falhas: 0 }, extra);
+}
+function iniciarFuga(c, de) {
+  cancelar(c);
+  const cam = fugirDe(c, de, 10);
+  c.tarefa = { tipo: 'fugir', de, ate: agora() + 30 }; c.caminho = cam || [];
+  log(`${c.nome} foge do ${de.nome.toLowerCase()}!`, 'ruim');
+}
+function golpearAnimal(c, a, tp) {
+  const d = Math.hypot(a.x - c.x, a.y - c.y);
+  if (tp === 'arco') {
+    if (c.flechas <= 0) return;
+    c.flechas--; estado.stats.flechas++;
+    const acerta = rnd() < clamp(0.88 - d * 0.04 - (a.vel > 2.2 ? 0.18 : 0) - (saude(c).dor * 0.2), 0.25, 0.92);
+    const ex = acerta ? 0 : (rnd() - 0.5) * 2.4, ey = acerta ? 0 : (rnd() - 0.5) * 2.4;
+    projeteis.push({ x0: c.x, y0: c.y, x1: a.x + ex, y1: a.y + ey, t: 0, dur: Math.max(0.12, d / 17), presa: a, acerta, dano: 11 + rnd() * 6, autor: c });
+    a.alerta = 1.2; return;
+  }
+  if (rnd() > (tp === 'socar' ? 0.7 : 0.82)) return;
+  ferirAnimal(a, DANO_ANIM[tp] * (0.6 + 0.4 * fatorTrab(c)) * (0.85 + rnd() * 0.3), c);
+}
+function ferirAnimal(a, dano, autor) {
+  if (a.morto) return;
+  a.hp -= dano; visDe(a).golpe = 0.3; a.alerta = 1.5; a.cacado = true;
+  respingo(a.x, a.y, 0.8);
+  if (a.hp <= 0) return morrerAnimal(a, autor);
+  if (a.esp === 'veado') { if (a.stamina > 0.15 && a.estado !== 'fugir') { const cam = fugirDe(a, autor, 10); if (cam) { a.estado = 'fugir'; a.caminho = cam; a.stamina -= 0.3; } } }
+  else if (a.estado !== 'partir') { atacar(a, autor, null); for (const o of animais) if (o !== a && o.bando === a.bando && !o.morto && o.estado !== 'partir' && o.estado !== 'atacar') atacar(o, autor, null); }
+}
+function morrerAnimal(a, autor) {
+  a.morto = true; a.estado = 'morto'; a.t = 0; a.caminho = []; a.vel = 0; a.cacar = false;
+  estado.stats.abatidos++;
+  log(`${autor ? autor.nome + ' abateu' : 'Morreu'} um(a) ${a.nome.toLowerCase()}. A carcaça pode ser carneada na bancada.`, 'bom');
+}
+function atualizarProjeteis(dt) {
+  for (let k = projeteis.length - 1; k >= 0; k--) {
+    const p = projeteis[k]; p.t += dt;
+    if (p.t < p.dur) continue;
+    projeteis.splice(k, 1);
+    const a = p.presa;
+    if (p.acerta && a && !a.morto && animais.includes(a) && Math.hypot(a.x - p.x1, a.y - p.y1) < 1.4) { ferirAnimal(a, p.dano, p.autor); estado.stats.flechasAcerto++; }
+    else flechasChao.push({ x: p.x1, y: p.y1, ang: Math.atan2(p.y1 - p.y0, p.x1 - p.x0), t: 0 });
+    if (flechasChao.length > 40) flechasChao.shift();
+  }
+}
+/* --------------------------- CAÇADA EM GRUPO --------------------------- */
+const ROT = (v, a) => ({ x: v.x * Math.cos(a) - v.y * Math.sin(a), y: v.x * Math.sin(a) + v.y * Math.cos(a) });
+function melhorPosicao(px, py, a, c, usadas) {
+  let m = null, ms = Infinity; const s = tileDe(c);
+  for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
+    const x = Math.round(px) + dx, y = Math.round(py) + dy;
+    if (!chaoFirme(x, y) || !passavel(x, y) || usadas.some(u => u.x === x && u.y === y)) continue;
+    const da = Math.hypot(x - a.x, y - a.y); if (da < 2.5) continue;
+    let sc = Math.hypot(x - px, y - py) + (coberto({ x, y }, a) ? -2.6 : 0);
+    if (sc < ms && alcancavel(s.x, s.y, x, y, false)) { ms = sc; m = { x, y, cob: coberto({ x, y }, a) }; }
+  }
+  return m || { x: Math.round(px), y: Math.round(py), cob: false };
+}
+function planejarCacada(h) {
+  const a = h.alvo, w = vento(), usadas = [];
+  const arq = h.cacadores.filter(c => c.arma === 'arco' && c.flechas > 0), mel = h.cacadores.filter(c => !arq.includes(c));
+  h.centro = { x: a.x, y: a.y }; h.pos = new Map(); h.papel = new Map();
+  const por = (c, v, R, papel) => { const p = melhorPosicao(a.x + v.x * R, a.y + v.y * R, a, c, usadas); usadas.push(p); h.pos.set(c, p); h.papel.set(c, papel); };
+  if (h.estrategia === 'Emboscada') {
+    arq.forEach((c, k) => por(c, ROT(w, (k - (arq.length - 1) / 2) * 0.55), 6, 'arqueiro'));
+    mel.forEach((c, k) => por(c, ROT(w, (k % 2 ? 1 : -1) * (0.7 + 0.25 * k)), 3.5, 'investida'));
+  } else if (h.estrategia === 'Cerco') {
+    const n = h.cacadores.length;
+    h.cacadores.forEach((c, k) => por(c, ROT(w, (k - (n - 1) / 2) * (Math.PI * 1.5 / Math.max(1, n - 1))), 5, 'cerco'));
+  } else { // Flanco: batedor vem a favor do vento; o outro dá a volta pelo lado e corta a fuga
+    por(h.cacadores[0], w, 6, 'batedor');
+    h.cacadores.slice(1).forEach((c, k) => por(c, ROT(w, (k % 2 ? -1 : 1) * 1.75), 5.5, 'flanco'));
+  }
+}
+function iniciarCacada(a, hs) {
+  hs = [...new Set(hs)].filter(c => colonos.includes(c) && !saude(c).caido && !c.carregadoPor).slice(0, 4);
+  if (hs.length < 2 || !a || a.morto) { mostrarToast('Escolha de 2 a 4 caçadores'); return null; }
+  for (const o of cacadas.slice()) if (o.cacadores.some(c => hs.includes(c))) encerrarCacada(o, false, 'cancelada');
+  const bando = a.bando ? animais.filter(o => o.bando === a.bando && !o.morto) : [a];
+  const estrategia = hs.some(c => c.arma === 'arco' && c.flechas > 0) ? 'Emboscada' : hs.length >= 3 ? 'Cerco' : 'Flanco';
+  const h = { id: ++idCacada, alvo: a, bando, estrategia, cacadores: hs, fase: 'posicionando', t: 0, tAtaque: 0, detectado: false, tiros0: estado.stats.flechas };
+  planejarCacada(h);
+  for (const c of hs) { cancelar(c); c.tarefa = { tipo: 'cacada', h, fase: 'indo', rp: 0 }; c.caminho = []; }
+  cacadas.push(h); estado.stats.cacadas++; a.cacar = true;
+  log(`Caçada em grupo — ${estrategia} contra ${bando.length > 1 ? 'o bando de ' + a.nome.toLowerCase() + 's (' + bando.length + ')' : 'um(a) ' + a.nome.toLowerCase()}: ${hs.map(c => c.nome).join(', ')}.`, 'bom');
+  return h;
+}
+function encerrarCacada(h, ok, motivo) {
+  const k = cacadas.indexOf(h); if (k < 0) return; cacadas.splice(k, 1);
+  if (ok) estado.stats.emboscadasOk++; else estado.stats.emboscadasFalha++;
+  if (h.detectado) estado.stats.cacadasDetectadas++;
+  log(`Caçada (${h.estrategia}) ${ok ? 'bem-sucedida' : 'fracassou'}${motivo ? ': ' + motivo : ''}.`, ok ? 'bom' : 'ruim');
+  for (const c of h.cacadores) { if (c.tarefa && (c.tarefa.h === h || c.tarefa.cacada === h)) fim(c); c.agachado = false; }
+}
+function atualizarCacadas(dt) {
+  for (const h of cacadas.slice()) {
+    h.t += dt;
+    const vivos = h.bando.filter(o => !o.morto && animais.includes(o));
+    if (h.alvo.morto) { encerrarCacada(h, true, `${h.alvo.nome.toLowerCase()} abatido(a)`); continue; }
+    if (!animais.includes(h.alvo)) { encerrarCacada(h, false, 'a presa escapou do mapa'); continue; }
+    const ativos = h.cacadores.filter(c => c.tarefa && (c.tarefa.h === h || c.tarefa.cacada === h));
+    if (!ativos.length) { encerrarCacada(h, false, 'os caçadores desistiram'); continue; }
+    if (h.fase === 'posicionando') {
+      if (Math.hypot(h.alvo.x - h.centro.x, h.alvo.y - h.centro.y) > 4) planejarCacada(h);
+      const notou = vivos.some(o => o.alerta >= 1 || o.estado === 'fugir' || o.estado === 'atacar');
+      const prontos = ativos.every(c => c.tarefa.fase === 'esperar');
+      if (notou || prontos || h.t > 120) {
+        h.fase = 'ataque'; h.tAtaque = h.t; h.detectado = notou && !prontos; h.emboscada = prontos && !notou;
+        log(h.detectado ? `A presa percebeu os caçadores antes da hora! (${h.estrategia})` : `${h.estrategia}! Todos em posição — atacar!`, h.detectado ? 'ruim' : 'bom');
+      }
+    } else if (h.t - h.tAtaque > 240 || ativos.every(c => Math.hypot(c.x - h.alvo.x, c.y - h.alvo.y) > 28)) encerrarCacada(h, false, 'a presa fugiu');
+  }
+}
+/* --------------------------- IA DOS COLONOS (v8) --------------------------- */
+const ESTILO_CARGA = { ombro: { nome: 'no ombro (bombeiro)', vel: 0.72 }, colo: { nome: 'no colo', vel: 0.78 }, arrastar: { nome: 'arrastando pelos braços', vel: 0.45 },
+  apoio: { nome: 'apoiando no ombro', vel: 0.5 }, cavalinho: { nome: 'de cavalinho', vel: 0.68 } };
+function estiloResgate(car, p) {
+  const s = saude(p), pe = piorEm(p, ['pe']), perna = piorEm(p, ['perna']), torso = piorEm(p, ['torso', 'cabeca']);
+  if (!s.caido) return pe.w > perna.w ? 'cavalinho' : 'apoio';
+  if (fatorTrab(car) < 0.75 || saude(car).dor > 0.3) return 'arrastar'; // carregador ferido: só consegue arrastar
+  if (perna.w > 0.45) return 'arrastar';                                  // perna quebrada/aberta: arrasta deitado
+  if (p.leve) return 'colo';                                              // paciente leve: no colo
+  if (s.inconsciente) return 'ombro';                                     // desacordado: no ombro (bombeiro)
+  if (torso.w >= Math.max(perna.w, pe.w)) return 'colo';                  // tronco ferido: no colo, sem dobrar a barriga
+  return 'ombro';
+}
+function liberarV8(c, t) {
+  if (t.tipo === 'tratar' && t.paciente) { const p = t.paciente; if (p.medico === c) p.medico = null; if (p.tarefa && p.tarefa.tipo === 'paciente' && p.tarefa.medico === c) p.tarefa = null; p.deitarTrat = false; }
+  if (t.tipo === 'resgatar' && t.paciente) {
+    const p = t.paciente; if (p.resgatador === c) p.resgatador = null;
+    if (p.carregadoPor === c) { p.carregadoPor = null; const q = livrePerto(Math.round(c.x), Math.round(c.y)) || tileDe(c); if (t.estilo !== 'apoio' && t.estilo !== 'cavalinho') { p.x = p.ax = q.x; p.y = p.ay = q.y; } }
+    if (p.tarefa && p.tarefa.tipo === 'apoiado') p.tarefa = null;
+  }
+  if (t.tipo === 'repousar' && t.cama && t.cama.ref && t.cama.ref.paciente === c) t.cama.ref.paciente = null;
+  if (t.tipo === 'esperarAjuda') c.pedeAjuda = false;
+  if (t.tipo === 'cacada' || t.tipo === 'lutar') c.agachado = false;
+}
+function seguirCarregado(c, p, t) {
+  const mx = Math.sin(c.yawAlvo), my = Math.cos(c.yawAlvo);
+  const ox = p.x, oy = p.y;
+  if (t.estilo === 'arrastar') { p.x = c.x - mx * 0.85; p.y = c.y - my * 0.85; }
+  else if (t.estilo === 'apoio') { p.x = c.x + my * 0.55; p.y = c.y - mx * 0.55; }
+  else { p.x = c.x; p.y = c.y; }
+  p.dist += Math.hypot(p.x - ox, p.y - oy); p.vel = c.vel; p.yawAlvo = c.yawAlvo; p.dir = c.dir;
+}
+function atualizarColonoV8(c, dt, horas) {
+  const s = saude(c), v = visDe(c);
+  atualizarSaude(c, horas);
+  if (s.dor > 0.25 && !s.caido && rnd() < s.dor * 0.25 * dt) v.careta = 0.7; // careta de dor
+  if (c.anim) { c.anim.t += dt; if (c.anim.t >= c.anim.dur) c.anim = null; else { c.vel = 0; return true; } }
+  if (c.carregadoPor) { c.dormindo = false; return true; }
+  if (s.caido) { if (!c.tarefa || c.tarefa.tipo !== 'repousar') { if (c.tarefa) fim(c); } c.vel = 0; c.caminho = []; c.dormindo = false; c.fome = Math.min(100, c.fome + CONFIG.QUEDA.fome * horas * 0.6); return true; }
+  // ameaça: animal atacando por perto -> enfrenta ou foge; aliados armados ajudam
+  c.ameacaT = (c.ameacaT || 0) - dt;
+  if (c.ameacaT <= 0) {
+    c.ameacaT = 0.4;
+    const atk = animais.find(a => !a.morto && a.estado === 'atacar' && a.alvo === c && Math.hypot(a.x - c.x, a.y - c.y) < 5 && !((a.inalc || 0) > agora()));
+    const tp = c.tarefa && c.tarefa.tipo;
+    if (atk && tp !== 'lutar' && tp !== 'fugir' && tp !== 'resgatar') {
+      const armado = c.arma || c.ferramentas.machado || c.ferramentas.picareta;
+      if ((armado || atk.esp === 'lobo') && s.dor < 0.5) { lutar(c, atk); log(`${c.nome} enfrenta o ${atk.nome.toLowerCase()}${c.arma ? ' com ' + (c.arma === 'arco' ? 'o arco' : 'a espada') : armado ? ' com a ferramenta' : ' com os punhos'}!`); }
+      else iniciarFuga(c, atk);
+      for (const o of colonos) {
+        if (o === c || saude(o).caido || o.carregadoPor || Math.hypot(o.x - c.x, o.y - c.y) > 14) continue;
+        const ot = o.tarefa && o.tarefa.tipo;
+        if (['lutar', 'resgatar', 'tratar', 'cacada', 'fugir', 'repousar'].includes(ot)) continue;
+        if (o.arma || o.ferramentas.machado || o.ferramentas.picareta) { lutar(o, atk); log(`${o.nome} corre para ajudar ${c.nome}!`); }
+      }
+    }
+  }
+  return false;
+}
+function tarefaMedicaUrgente(c) {
+  if (!c.prioridades.medico || saude(c).caido) return false;
+  const cands = [];
+  for (const p of colonos) {
+    if (p === c || p.carregadoPor || p.resgatador) continue;
+    const s = saude(p);
+    if ((s.caido && !(p.tarefa && p.tarefa.tipo === 'repousar')) || (p.pedeAjuda && !s.caido)) cands.push({ x: Math.round(p.x), y: Math.round(p.y), adj: true, p });
+  }
+  if (!cands.length) return tratarUrgente(c);
+  const r = melhorAlvo(c, cands, 3);
+  if (!r) return tratarUrgente(c);
+  const p = r.alvo.p, estilo = estiloResgate(c, p);
+  p.resgatador = c; p.pedeAjuda = false;
+  if (!saude(p).caido) { const cama = p.tarefa && p.tarefa.cama; if (p.tarefa) fim(p); p.tarefa = { tipo: 'apoiado', por: c, cama }; }
+  c.tarefa = { tipo: 'resgatar', paciente: p, estilo, fase: 'indo', t: 0, rp: 1 }; c.caminho = r.caminho;
+  log(`${c.nome} vai ${saude(p).caido ? 'resgatar' : 'ajudar'} ${p.nome}.`);
+  return true;
+}
+function afastarDoPaciente(c, p) { // escolhe um lado livre (esquerda/direita primeiro) para tratar quem está deitado
+  const px = Math.round(p.x), py = Math.round(p.y), s = tileDe(c);
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1]]) {
+    const x = px + dx, y = py + dy;
+    if (!dentro(x, y) || !passavel(x, y) || mapa.estrutura[idx(x, y)] === ESTR.CAMA || colonos.some(o => o !== c && Math.round(o.x) === x && Math.round(o.y) === y)) continue;
+    const cam = aEstrela(s.x, s.y, x, y); if (cam && cam.length) { c.caminho = cam; return true; }
+  }
+  return false;
+}
+function tratarUrgente(c) { // tratar ferimentos vem antes do trabalho comum
+  const cs = { medico: [], caca: [] }; candidatosV8(c, { medico: 1 }, cs);
+  if (!cs.medico.length) return false;
+  const r = melhorAlvo(c, cs.medico, 3);
+  return !!(r && iniciarV8(c, r));
+}
+function candidatosV8(c, P, cands) {
+  if (P.medico && !saude(c).caido) for (const p of colonos) {
+    if (p === c || p.medico || p.carregadoPor || p.resgatador || !precisaTratar(p)) continue;
+    if (p.tarefa && ['lutar', 'fugir', 'cacada', 'apoiado', 'esperarAjuda'].includes(p.tarefa.tipo)) continue;
+    if (p.tarefa && p.tarefa.tipo === 'repousar' && p.tarefa.fase === 'indo') continue;
+    cands.medico.push({ x: Math.round(p.x), y: Math.round(p.y), adj: true, v8: 'tratar', p });
+  }
+  if (P.caca && !saude(c).caido) for (const a of animais) if (a.cacar && !a.morto && !colonos.some(o => o.tarefa && o.tarefa.presa === a && o.tarefa.job))
+    cands.caca.push({ x: Math.round(a.x), y: Math.round(a.y), adj: true, v8: 'cacar', presa: a });
+}
+function iniciarV8(c, r) {
+  const a = r.alvo;
+  if (a.v8 === 'cacar') { lutar(c, a.presa, { job: true }); c.caminho = r.caminho; log(`${c.nome} saiu para caçar um(a) ${a.presa.nome.toLowerCase()}.`); return true; }
+  if (a.v8 === 'tratar') {
+    const p = a.p; p.medico = c;
+    const t = { tipo: 'tratar', paciente: p, fase: 'ir', rp: 0, progresso: 0, total: 0 };
+    const precisaBand = saude(p).feridas.some(f => f.tipo !== 'contusao' && !f.band);
+    if (c.bandagens < 2 && precisaBand) {
+      const bs = itens.filter(it => it.tipo === 'BANDAGEM' && !it.reservado).map(it => ({ x: it.x, y: it.y, adj: false, item: it }));
+      const rb = bs.length && melhorAlvo(c, bs, 2);
+      if (rb) { rb.alvo.item.reservado = c; t.fase = 'buscar'; t.item = rb.alvo.item; c.tarefa = t; c.caminho = rb.caminho; return true; }
+    }
+    c.tarefa = t; c.caminho = r.caminho; return true;
+  }
+  return false;
+}
+function tentarEquipar(c) {
+  const busca = (tipo, cond) => {
+    if (!cond) return false;
+    const cs = itens.filter(it => it.tipo === tipo && !it.reservado).map(it => ({ x: it.x, y: it.y, adj: false, item: it }));
+    if (!cs.length) return false;
+    const r = melhorAlvo(c, cs, 2); if (!r || r.caminho.length > 60) return false;
+    r.alvo.item.reservado = c; c.tarefa = { tipo: 'pegar', fase: 'indo', item: r.alvo.item }; c.caminho = r.caminho; return true;
+  };
+  const caca = c.prioridades.caca && c.prioridades.caca <= 2;
+  return busca('ARCO', !c.arma && caca) || busca('ESPADA', !c.arma) || busca('ARCO', !c.arma) || busca('ESCUDO', !c.escudo && c.arma !== 'arco')
+    || busca('FLECHAS', c.arma === 'arco' && c.flechas < 8) || busca('BANDAGEM', c.prioridades.medico && c.bandagens < 2);
+}
+function equipar(c, it) {
+  const tp = it.tipo;
+  if (tp === 'ESPADA' || tp === 'ARCO') {
+    if (c.arma) largarItem(Math.round(c.x), Math.round(c.y), c.arma.toUpperCase(), 1);
+    c.arma = tp.toLowerCase(); removerItem(it);
+    if (c.arma === 'arco' && c.escudo) { c.escudo = false; largarItem(Math.round(c.x), Math.round(c.y), 'ESCUDO', 1); log(`${c.nome} deixou o escudo: o arco usa as duas mãos.`); }
+  } else if (tp === 'ESCUDO') { if (c.arma === 'arco') { it.reservado = null; return; } c.escudo = true; removerItem(it); }
+  else if (tp === 'FLECHAS' || tp === 'BANDAGEM') {
+    const campo = tp === 'FLECHAS' ? 'flechas' : 'bandagens', max = tp === 'FLECHAS' ? 20 : 4, q = Math.min(max - (c[campo] || 0), it.qtd);
+    c[campo] = (c[campo] || 0) + q; it.qtd -= q; it.reservado = null; if (it.qtd <= 0) removerItem(it);
+  }
+  log(`${c.nome} equipou ${ITEM[tp].nome.toLowerCase()}.`);
+}
+function executarV8(c, dt, min) {
+  const t = c.tarefa; if (!t) return false;
+  const chegou = c.caminho.length === 0;
+  switch (t.tipo) {
+    case 'paciente': { const m = t.medico; if (!m || !m.tarefa || m.tarefa.paciente !== c) { fim(c); return true; } if (m.tarefa.fase === 'fazendo') virarPara(c, m.x, m.y); return true; }
+    case 'apoiado': case 'esperarAjuda':
+      if (t.tipo === 'esperarAjuda' && agora() > t.ate) { // ninguém veio: vai mancando sozinho
+        c.pedeAjuda = false; const cama = t.cama, s = tileDe(c), cam = aEstrela(s.x, s.y, cama.x, cama.y);
+        c.tarefa = { tipo: 'repousar', fase: 'indo', cama, camaReal: cama.real }; c.caminho = cam || []; return true;
+      }
+      if (t.tipo === 'apoiado' && (!t.por || !t.por.tarefa || t.por.tarefa.paciente !== c)) fim(c);
+      return true;
+    case 'repousar': {
+      if (t.fase === 'indo') { if (chegou) deitarNaCama(c, t.cama); return true; }
+      const s = saude(c), h = horaDoDia();
+      const pronto = s.dor < 0.25 && s.sangue > 65 && fatorMov(c) > 0.72 && !precisaTratar(c) && !s.feridas.some(f => f.infec > 0.15);
+      const cansouDaCama = agora() - (t.desde || 0) > 16 * 60;
+      if (!s.caido && agora() - (t.desde || 0) > 60 && (pronto || cansouDaCama || (c.fome < 18 && existeComida())) && !c.medico) {
+        if ((h >= 22 || h < 5) && c.sono < 80 && t.camaReal && pronto && c.camaPropria === (t.cama && t.cama.ref)) { // já está na própria cama: dorme
+          fim(c); c.tarefa = { tipo: 'dormir', fase: 'fazendo' }; c.dormindo = true; c.naCama = true; return true; }
+        const daCama = t.camaReal; fim(c); c.saiuCama = agora(); c.sentado = false;
+        c.anim = { tipo: 'levantar', t: 0, dur: 1.3, daCama }; contarAnim('levantar');
+        log(`${c.nome} se levanta da cama${pronto ? ', recuperado(a)' : ''}.`, pronto ? 'bom' : '');
+      }
+      return true;
+    }
+    case 'fugir':
+      if (chegou || agora() > t.ate) { fim(c); c.pensarT = 1.5; }
+      return true;
+    case 'resgatar': {
+      const p = t.paciente;
+      if (!colonos.includes(p) || (p.carregadoPor && p.carregadoPor !== c)) { fim(c); return true; }
+      if (t.fase === 'indo') {
+        const d = Math.hypot(p.x - c.x, p.y - c.y);
+        t.ini = t.ini || agora();
+        if (agora() - t.ini > 240) { falhas.set(idx(Math.round(p.x), Math.round(p.y)), agora() + 60); p.resgatador = null; fim(c); return true; }
+        if (d > 2.4 || (d > 1.6 && !chegou)) { if (chegou || (t.rp -= dt) <= 0) { t.rp = 1; const s = tileDe(c), cam = aEstrela(s.x, s.y, Math.round(p.x), Math.round(p.y), true); if (!cam) { falhas.set(idx(Math.round(p.x), Math.round(p.y)), agora() + 60); p.resgatador = null; fim(c); } else if (!cam.length && d <= 2.4) { /* já está ao lado */ } else c.caminho = cam; } if (d > 2.4 || c.caminho.length) return true; }
+        c.caminho = []; virarPara(c, p.x, p.y);
+        const fb = saude(p).feridas.find(f => f.sangra >= 18 && !f.pressionado);
+        if (fb) { t.fase = 'estabilizar'; t.f = fb; t.anim = 'pressionar'; t.progresso = 0; t.total = DUR_TRAT.pressionar; c.acaoF = c.aAcaoF = 0; contarAnim('pressionar'); log(`${c.nome} pressiona o sangramento de ${p.nome} antes de carregá-lo(a).`); return true; }
+        t.fase = 'pegando'; t.t = 0; t.cama = (p.tarefa && p.tarefa.cama) || escolherCama(p); if (t.cama.real && t.cama.ref) t.cama.ref.paciente = p;
+        t.estilo = estiloResgate(c, p); return true;
+      }
+      if (t.fase === 'estabilizar') {
+        virarPara(c, p.x, p.y); t.progresso += min; avancarAcao(c, t, dt);
+        if (t.progresso >= t.total) { aplicarTratamento(c, p, t.f, 'pressionar'); t.fase = 'pegando'; t.t = 0; t.cama = escolherCama(p); t.estilo = estiloResgate(c, p); t.total = 0; }
+        return true;
+      }
+      if (t.fase === 'pegando') {
+        virarPara(c, p.x, p.y); t.t += dt;
+        if (t.t >= 0.9) {
+          const s = tileDe(c), cam = aEstrela(s.x, s.y, t.cama.x, t.cama.y);
+          p.carregadoPor = c; p.pedeAjuda = false;
+          if (!cam) { deitarNaCama(p, { x: s.x, y: s.y, real: false }); p.carregadoPor = null; p.resgatador = null; fim(c); return true; }
+          t.fase = 'levando'; c.caminho = cam; estado.stats.carregar[t.estilo] = (estado.stats.carregar[t.estilo] || 0) + 1;
+          log(`${c.nome} leva ${p.nome} ${ESTILO_CARGA[t.estilo].nome}.`);
+        }
+        return true;
+      }
+      if (t.fase === 'levando') { seguirCarregado(c, p, t); if (chegou) { t.fase = 'soltando'; t.t = 0; } return true; }
+      if (t.fase === 'soltando') {
+        t.t += dt;
+        if (t.t >= 0.9) { p.carregadoPor = null; p.resgatador = null; deitarNaCama(p, t.cama); if (t.cama.ref) t.cama.ref.paciente = p; estado.stats.resgates++; log(`${p.nome} foi levado(a) para ${t.cama.real ? 'a cama (médica)' : 'o saco de dormir'}.`, 'bom'); t.paciente = null; fim(c); afastarDoPaciente(c, p); if (c.caminho.length) c.tarefa = { tipo: 'vagar', fase: 'indo' }; }
+        return true;
+      }
+      return true;
+    }
+    case 'tratar': {
+      const p = t.paciente;
+      if (!colonos.includes(p) || p.carregadoPor || saude(c).caido) { fim(c); return true; }
+      if (t.fase === 'buscar') {
+        if (!itemExiste(t.item)) { t.fase = 'ir'; return true; }
+        if (!chegou) return true;
+        const it = t.item, q = Math.min(3, it.qtd); it.qtd -= q; it.reservado = null; if (it.qtd <= 0) removerItem(it);
+        c.bandagens = (c.bandagens || 0) + q; t.item = null; t.fase = 'ir'; return true;
+      }
+      if (t.fase === 'ir') {
+        const d = Math.hypot(p.x - c.x, p.y - c.y);
+        if (d < 6 && !pacienteDeitado(p) && !(p.tarefa && p.tarefa.tipo === 'paciente')) { if (p.tarefa) fim(p); p.caminho = []; p.tarefa = { tipo: 'paciente', medico: c }; }
+        if (d < 0.8) { if (!c.caminho.length && !afastarDoPaciente(c, p)) { t.fase = 'proxima'; } return true; } // em cima do paciente/cama: vai para o lado
+        if (d <= 1.6 || (chegou && d <= 2.4)) { c.caminho = []; t.fase = 'proxima'; return true; }
+        t.ini = t.ini || agora(); if (agora() - t.ini > 240) { falhas.set(idx(Math.round(p.x), Math.round(p.y)), agora() + 60); fim(c); return true; }
+        if (chegou || (t.rp -= dt) <= 0) { t.rp = 1; const s = tileDe(c), cam = aEstrela(s.x, s.y, Math.round(p.x), Math.round(p.y), true); if (!cam) { falhas.set(idx(Math.round(p.x), Math.round(p.y)), agora() + 60); fim(c); } else c.caminho = cam; }
+        return true;
+      }
+      if (t.fase === 'proxima') {
+        const s = saude(p); let an = null, f = null;
+        if (s.caido && !t.examinou) { an = 'examinar'; t.examinou = true; }
+        else { const fs = s.feridas.filter(feridaPede).sort((a, b) => PRIO_FERIDA(a) - PRIO_FERIDA(b)); f = fs[0] || null; if (f) an = escolherTratamento(p, f, c.bandagens > 0); }
+        if (!an && pacienteNaCama(p) && !s.caido && !p.sentado && !t.sentou) { an = 'ajudarSentar'; t.sentou = true; }
+        if (!an) { log(`${c.nome} terminou de tratar ${p.nome}.`, 'bom'); fim(c); return true; }
+        t.anim = an; t.f = f; t.progresso = 0; t.total = DUR_TRAT[an] || 24; t.fase = 'fazendo'; c.acaoF = c.aAcaoF = 0; contarAnim(an);
+        if (an === 'tratarTorso' && !pacienteDeitado(p)) p.deitarTrat = true;
+        if (estado.stats.tratamentos < 40) log(`${c.nome} ${NOME_TRAT[an]} de ${p.nome}${an.startsWith('bandagem') || an.startsWith('tala') || an === 'tratarInfeccao' ? (c.bandagens > 0 ? ' (com bandagem)' : ' (sem bandagem)') : ''}.`);
+        return true;
+      }
+      if (t.fase === 'fazendo') {
+        if (Math.hypot(p.x - c.x, p.y - c.y) > 2.3) { t.fase = 'ir'; return true; }
+        virarPara(c, p.x, p.y); if (!pacienteDeitado(p)) virarPara(p, c.x, c.y);
+        t.progresso += min * (0.7 + 0.3 * fatorTrab(c)); avancarAcao(c, t, dt);
+        if (t.progresso >= t.total) { aplicarTratamento(c, p, t.f, t.anim); p.deitarTrat = false; t.fase = 'proxima'; }
+        return true;
+      }
+      return true;
+    }
+    case 'lutar': {
+      const a = t.presa;
+      if (!a || a.morto || !animais.includes(a)) { fim(c); c.pensarT = 1; return true; }
+      t.ini = t.ini || agora();
+      if (t.segurar && t.cacada && cacadas.includes(t.cacada) && agora() - t.ini < 30 && t.segurar(c, t)) { c.caminho = []; c.agachado = true; virarPara(c, a.x, a.y); return true; }
+      c.agachado = false;
+      const d = Math.hypot(a.x - c.x, a.y - c.y), arco = c.arma === 'arco' && c.flechas > 0;
+      const alcance = arco ? 7.5 : 1.6; // inclui a diagonal
+      t.rp -= dt;
+      t.ini = t.ini || agora();
+      const fugindo = a.estado === 'partir' && d > alcance + 1.5, limite = t.cacada ? 300 : t.job ? 360 : 150;
+      if (d > 32 || (fugindo && !t.job) || agora() - t.ini > limite) { log(`${c.nome} desistiu de perseguir o ${a.nome.toLowerCase()}.`); fim(c); c.pensarT = 1; return true; }
+      if (d > alcance || (arco && !linhaDeVisao(c, a))) {
+        t.fase = 'indo';
+        if (t.rp <= 0 || !c.caminho.length) { t.rp = 0.6; const s = tileDe(c), cam = aEstrela(s.x, s.y, Math.round(a.x), Math.round(a.y), true, 8000); if (cam) { c.caminho = arco ? cam.slice(0, Math.max(1, cam.length - 4)) : cam; t.falhas = 0; } else if (++t.falhas > 8) { a.inalc = agora() + 120; fim(c); } }
+        return true;
+      }
+      c.caminho = []; t.fase = 'fazendo'; virarPara(c, a.x, a.y);
+      const tp = animArma(c), def = ACOES[tp], f0 = c.acaoF;
+      c.acaoF = (c.acaoF + dt * def.ritmo * (0.6 + 0.4 * fatorTrab(c))) % 1;
+      for (const g of def.golpes) if (cruzou(f0, c.acaoF, g)) { golpearAnimal(c, a, tp); if (tp !== 'arco') impactoLuta(c, a); }
+      return true;
+    }
+    case 'cacada': {
+      const h = t.h;
+      if (!cacadas.includes(h)) { fim(c); return true; }
+      const pos = h.pos.get(c), papel = h.papel.get(c), a = h.alvo;
+      if (h.fase === 'ataque') {
+        const alvo = !a.morto ? a : h.bando.find(o => !o.morto) || a;
+        let segurar = null;
+        if (papel === 'investida' && !h.detectado) segurar = () => estado.stats.flechas === h.tiros0 && h.t - h.tAtaque < 4; // corpo a corpo espera a primeira flechada
+        if (papel === 'flanco' && !h.detectado) segurar = () => Math.hypot(alvo.x - c.x, alvo.y - c.y) > 4.5 && h.t - h.tAtaque < 7; // flanco espera a presa vir na direção dele
+        c.tarefa = { tipo: 'lutar', presa: alvo, fase: 'indo', rp: 0, falhas: 0, cacada: h, segurar };
+        return true;
+      }
+      const da = Math.hypot(a.x - c.x, a.y - c.y);
+      c.agachado = da < 14;
+      if (t.fase === 'indo') {
+        if (Math.hypot(pos.x - c.x, pos.y - c.y) < 0.7 && chegou) { t.fase = 'esperar'; return true; }
+        if (chegou && (t.rp -= dt) <= 0) { t.rp = 1.5; const s = tileDe(c), cam = aEstrela(s.x, s.y, pos.x, pos.y); if (cam && cam.length) c.caminho = cam; else t.fase = 'esperar'; }
+      } else { c.caminho = []; virarPara(c, a.x, a.y); }
+      return true;
+    }
+  }
+  return false;
+}
+function impactoLuta(c, a) { if (Q.nivel > 0) for (let k = 0; k < 3; k++) particula('poeira', (a.x + 0.5) * T + rv(-6, 6), (a.y + 0.5) * T + 8, 2, rv(-12, 12), rv(-6, 6), 6, 0.5, { g: 0, tam: 3 }); }
+function tipoAcaoV8(c, t) {
+  if (t.tipo === 'tratar' && t.fase === 'fazendo') return t.anim;
+  if (t.tipo === 'resgatar' && t.fase === 'estabilizar') return 'pressionar';
+  if (t.tipo === 'lutar' && t.fase === 'fazendo') return animArma(c);
+  if (t.tipo === 'fabricar' && t.bancada && t.bancada.fazendo && t.bancada.fazendo.startsWith('CARNEAR')) return 'entalhar';
+  return null;
+}
+function descreverTarefaV8(c, t) {
+  const pct = t.total ? ` (${Math.floor(Math.min(1, t.progresso / t.total) * 100)}%)` : '';
+  switch (t.tipo) {
+    case 'tratar': return t.fase === 'buscar' ? 'Buscando bandagens.' : t.fase === 'fazendo' ? `Médico: ${NOME_TRAT[t.anim]} de ${t.paciente.nome}${pct}` : `Indo tratar ${t.paciente.nome}.`;
+    case 'resgatar': return t.fase === 'indo' ? `Indo socorrer ${t.paciente.nome}.` : t.fase === 'estabilizar' ? `Estancando o sangramento de ${t.paciente.nome}.` : `Levando ${t.paciente.nome} ${ESTILO_CARGA[t.estilo].nome}.`;
+    case 'paciente': return `Sendo tratado(a) por ${t.medico.nome}.`;
+    case 'repousar': return t.fase === 'indo' ? 'Indo repousar.' : saude(c).caido ? 'Caído(a) na cama — se recuperando.' : t.camaReal ? 'Repousando na cama (médica).' : 'Repousando.';
+    case 'apoiado': return `Sendo ajudado(a) por ${t.por.nome}.`;
+    case 'esperarAjuda': return 'Esperando ajuda para andar.';
+    case 'fugir': return `Fugindo do ${t.de.nome.toLowerCase()}!`;
+    case 'lutar': return (t.segurar ? 'Esperando o sinal — ' : t.fase === 'indo' ? 'Indo atacar ' : 'Lutando com ') + `${t.presa.nome.toLowerCase()}` + (t.cacada ? ` (${t.cacada.estrategia})` : '') + '.';
+    case 'cacada': return `Caçada (${t.h.estrategia}): ${t.fase === 'esperar' ? 'escondido(a), esperando' : 'aproximando-se agachado(a)'}.`;
+  }
+  return null;
+}
+if (!CONFIG.TEMPOS) CONFIG.TEMPOS = {};
+/* ------------------------------ EVENTOS e TICK ------------------------------ */
+function dispararEventoV8(tipo) {
+  if (tipo === 'lobos') {
+    const n = 2 + Math.floor(rnd() * 2), l = grupoAnimais('lobo', n, 26, true, { caca: true, ate: agora() + 1.3 * 1440 });
+    if (!l.length) return false;
+    estado.stats.eventoLobos++;
+    log(`Uma matilha de ${n} lobos apareceu na borda do mapa.`, 'ruim');
+    carta('Lobos', `Uma matilha de ${n} lobos chegou. De noite eles caçam: podem atacar os colonos.\n\nArme os colonos (espada, arco, escudo — bancada) ou use Caçada em grupo para emboscá-los.`, 'ruim');
+    return true;
+  }
+  if (tipo === 'urso') { const l = grupoAnimais('urso', 1, 24, false, { ate: agora() + 2 * 1440 }); if (!l.length) return false; log('Um urso se instalou no mapa. Não chegue perto do território dele.', 'ruim'); carta('Urso', 'Um urso apareceu. Ele é territorial: ataca quem chega perto demais.', 'ruim'); return true; }
+  if (tipo === 'veados') { const l = grupoAnimais('veado', 3, 16, true); if (!l.length) return false; log('Uma manada de veados entrou no mapa.', 'bom'); return true; }
+  return false;
+}
+function ataqueForcado(esp, alvo) { // para testes / depuração
+  const c = alvo || colonos[0];
+  const l = esp === 'urso' ? grupoAnimais('urso', 1, 10, false, { ate: agora() + 720 }) : grupoAnimais('lobo', 2 + Math.floor(rnd() * 2), 14, false, { caca: true, ate: agora() + 1440 });
+  for (const a of l) { a.forcado = true; if (a.esp === 'urso') a.casa = { x: Math.round(c.x), y: Math.round(c.y) }; atacar(a, c, null); }
+  if (l.length) log(`Ataque: ${l.length} ${l[0].nome.toLowerCase()}(s) vêm atrás de ${c.nome}!`, 'ruim');
+  return l;
+}
+function autoPedidos() {
+  if (!mapa.bancadas.length) return;
+  const est = estoque(), q = k => estado.pedidos.filter(p => p === k).length + mapa.bancadas.filter(b => b.fazendo === k).length;
+  for (const esp of ['VEADO', 'LOBO', 'URSO']) if ((est['CARC_' + esp] || 0) > q('CARNEAR_' + esp)) { estado.pedidos.push('CARNEAR_' + esp); log(`Pedido automático: carnear ${esp.toLowerCase()}.`); }
+  const band = (est.BANDAGEM || 0) + colonos.reduce((s, c) => s + (c.bandagens || 0), 0);
+  if (band + 3 * q('BANDAGEM') + q('BANDAGEM_FIBRA') < 4) {
+    if ((est.PELE || 0) >= 1) estado.pedidos.push('BANDAGEM'); else if ((est.FRUTAS || 0) >= 40) estado.pedidos.push('BANDAGEM_FIBRA');
+  }
+  if (q('FLECHAS') === 0 && colonos.some(c => c.arma === 'arco' && c.flechas < 8) && !(est.FLECHAS > 4) && (est.MADEIRA || 0) >= 10) estado.pedidos.push('FLECHAS');
+}
+let acumV8 = 0;
+function atualizarV8(dt, minutos) {
+  for (const a of animais.slice()) atualizarAnimal(a, dt);
+  atualizarProjeteis(dt); atualizarCacadas(dt);
+  acumV8 += minutos;
+  if (acumV8 >= 60) { acumV8 = 0; autoPedidos(); if (horaDoDia() >= 6 && horaDoDia() < 7) estado.vento = rnd() * Math.PI * 2; }
+}
+/* ------------------------------ ARTE v8 ------------------------------ */
+const P_ = (x, y, atras, ex) => Object.assign({ x, y, atras }, ex);
+function alvoL(ac, b, reach = 12) { // alvo (parte do paciente) no referencial do corpo do médico, limitado ao alcance do braço
+  let x = ac.alvo ? ac.alvo.x : b.fx * 8, y = (ac.alvo ? ac.alvo.y : 6 + b.fy * 8) - b.cy;
+  const sx = 0, sy = 3, d = Math.hypot(x - sx, y - sy);
+  if (d > reach) { x = sx + (x - sx) / d * reach; y = sy + (y - sy) / d * reach; }
+  return { x, y };
+}
+const TAU = Math.PI * 2;
+const ROLO = (g, x, y) => { circulo(g, x, y, 2.1); g.fillStyle = '#f4f1e8'; g.fill(); g.lineWidth = 0.8; g.strokeStyle = CONTORNO; g.stroke(); circulo(g, x, y, 0.7); g.fillStyle = '#c9c2b0'; g.fill(); };
+function voltasBandagem(g, A, rx, ry, n, cor = '#f4f1e8') { for (let k = 0; k < n; k++) { g.beginPath(); g.ellipse(A.x, A.y - (k - n / 2) * 1.2, rx, ry, 0, 0, Math.PI); g.lineWidth = 1.6; g.strokeStyle = CONTORNO; g.stroke(); g.lineWidth = 1; g.strokeStyle = cor; g.stroke(); } }
+function orbitaBandagem(ac, b, rx, ry, holdOff) {
+  const A = alvoL(ac, b), ang = ac.f * TAU, rolo = { x: A.x + Math.cos(ang) * rx, y: A.y + Math.sin(ang) * ry }, atrasR = Math.sin(ang) < 0;
+  const n = 1 + Math.floor((ac.k || 0) * 5);
+  return { maos: [P_(rolo.x, rolo.y, atrasR || b.atras), P_(A.x + holdOff.x, A.y + holdOff.y, b.atras)],
+    prop: g => { voltasBandagem(g, A, rx * 0.8, ry * 0.8 + 0.6, n); g.beginPath(); g.moveTo(A.x + Math.cos(ang - 0.9) * rx * 0.8, A.y + Math.sin(ang - 0.9) * ry * 0.8); g.lineTo(rolo.x, rolo.y); g.lineWidth = 1.1; g.strokeStyle = '#f4f1e8'; g.stroke(); if (!atrasR) ROLO(g, rolo.x, rolo.y); } };
+}
+function talas(g, A, L, ang, n) {
+  for (const o of [-1.6, 1.6]) { const ox = Math.cos(ang + Math.PI / 2) * o, oy = Math.sin(ang + Math.PI / 2) * o * 0.6;
+    g.beginPath(); g.moveTo(A.x + ox - Math.cos(ang) * L / 2, A.y + oy - Math.sin(ang) * L / 2); g.lineTo(A.x + ox + Math.cos(ang) * L / 2, A.y + oy + Math.sin(ang) * L / 2);
+    g.lineCap = 'round'; g.lineWidth = 2.6; g.strokeStyle = CONTORNO; g.stroke(); g.lineWidth = 1.6; g.strokeStyle = '#b07d4b'; g.stroke(); }
+  for (let k = 0; k < n; k++) { const q = (k + 0.5) / Math.max(n, 1) - 0.5; circulo(g, A.x + Math.cos(ang) * L * q * 0.8, A.y + Math.sin(ang) * L * q * 0.8, 1.9); g.lineWidth = 1; g.strokeStyle = '#f4f1e8'; g.stroke(); }
+}
+const POSES = {
+  // 1-6: tratamentos sem bandagem, um por região do corpo
+  tratarPerna: (ac, b) => { const A = alvoL(ac, b), e = Math.sin(ac.f * TAU); return { maos: [P_(A.x - b.lx * 2.6, A.y - 1 + Math.max(0, e) * 1.8, b.atras), P_(A.x + b.lx * 2.6, A.y - 1 + Math.max(0, -e) * 1.8, b.atras)] }; },
+  tratarPe: (ac, b) => { const A = alvoL(ac, b), a = ac.f * TAU; return { maos: [P_(A.x + Math.cos(a) * 2.4, A.y + Math.sin(a) * 1.3, b.atras), P_(A.x - Math.cos(a) * 2.4, A.y - Math.sin(a) * 1.3, b.atras)] }; },
+  tratarBraco: (ac, b) => { const A = alvoL(ac, b), e = Math.sin(ac.f * TAU); return { maos: [P_(A.x, A.y, b.atras), P_(A.x - b.lx * (1.5 + (e + 1) * 2.6), A.y - 2 - b.ly * (e + 1) * 2, b.atras)] }; },
+  tratarMao: (ac, b) => { const A = alvoL(ac, b), j = Math.sin(ac.f * TAU * 3); return { maos: [P_(A.x - b.lx * 1.8, A.y - 0.5 + j * 0.8, b.atras), P_(A.x + b.lx * 1.8, A.y - 0.5 - j * 0.8, b.atras)],
+    prop: g => { circulo(g, A.x, A.y - 0.5 + j * 0.3, 0.9); g.fillStyle = 'rgba(240,240,220,.9)'; g.fill(); } }; },
+  tratarCabeca: (ac, b) => { const A = alvoL(ac, b, 13), e = Math.sin(ac.f * TAU) * 1.3, sq = (1 + Math.cos(ac.f * TAU)) * 0.4; return { maos: [P_(A.x - b.lx * (5.6 - sq), A.y + e, b.atras), P_(A.x + b.lx * (5.6 - sq), A.y + e, b.atras)] }; },
+  tratarTorso: (ac, b) => { const A = alvoL(ac, b), a = ac.f * TAU, m = { x: A.x + Math.cos(a) * 3, y: A.y + Math.sin(a) * 1.5 }; return { maos: [P_(m.x, m.y, b.atras), P_(m.x + b.lx * 2.2, m.y + 1.2, b.atras)] }; },
+  // 7-10: bandagens (o rolo dá voltas em volta da parte; as voltas vão aparecendo)
+  bandagemPerna: (ac, b) => orbitaBandagem(ac, b, 3.4, 1.6, { x: -b.lx * 2.5, y: -2 }),
+  bandagemBraco: (ac, b) => orbitaBandagem(ac, b, 2.6, 2.6, { x: b.fx * 2, y: -2.5 }),
+  bandagemCabeca: (ac, b) => orbitaBandagem(ac, b, 8.8, 3, { x: b.lx * 7, y: 1 }),
+  bandagemTorso: (ac, b) => orbitaBandagem(ac, b, 9.5, 4.2, { x: -b.lx * 6, y: -3 }),
+  // 11-12: talas (traz as varetas, depois amarra puxando as pontas)
+  talaPerna: (ac, b) => { const A = alvoL(ac, b), k = ac.k || 0, ang = Math.atan2(b.fy, b.fx) + Math.PI / 2;
+    if (k < 0.4) { const e = suave(k / 0.4), m = { x: lerp(b.lx * 4, A.x, e), y: lerp(4, A.y, e) }; return { maos: [P_(m.x, m.y, b.atras), P_(m.x - b.lx * 2, m.y, b.atras)], prop: g => talas(g, m, 10, ang, 0) }; }
+    const p = Math.abs(Math.sin(ac.f * TAU)) * 3; return { maos: [P_(A.x - b.lx * (1.5 + p), A.y - 1, b.atras), P_(A.x + b.lx * (1.5 + p), A.y - 1, b.atras)], prop: g => talas(g, A, 10, ang, 1 + Math.floor((k - 0.4) / 0.6 * 3.9)) }; },
+  talaBraco: (ac, b) => { const A = alvoL(ac, b), k = ac.k || 0, ang = Math.atan2(b.ly, b.lx);
+    if (k < 0.4) { const e = suave(k / 0.4), m = { x: lerp(-b.lx * 4, A.x, e), y: lerp(2, A.y, e) }; return { maos: [P_(m.x, m.y, b.atras), P_(m.x + b.lx * 2, m.y - 1, b.atras)], prop: g => talas(g, m, 7.5, ang, 0) }; }
+    const p = Math.abs(Math.sin(ac.f * TAU)) * 2.4; return { maos: [P_(A.x, A.y - 1.5 - p, b.atras), P_(A.x + b.fx * 1.5, A.y + 1.5 + p, b.atras)], prop: g => talas(g, A, 7.5, ang, 1 + Math.floor((k - 0.4) / 0.6 * 2.9)) }; },
+  // 13: pressão no sangramento forte (empurra com o peso do corpo)
+  pressionar: (ac, b) => { const A = alvoL(ac, b), e = Math.max(0, Math.sin(ac.f * TAU)) * 1.8; return { maos: [P_(A.x, A.y + e, b.atras), P_(A.x + b.lx * 0.8, A.y - 1.4 + e, b.atras)],
+    prop: g => { circulo(g, A.x, A.y + 2.2, 2.6 * (1 - (ac.k || 0)) + 1 + e * 0.3); g.fillStyle = 'rgba(150,15,15,.75)'; g.fill(); } }; },
+  // 14: limpar com pano e desinfetante (garrafinha inclina e pinga)
+  limpar: (ac, b) => { const A = alvoL(ac, b), z = Math.sin(ac.f * TAU * 2) * 3, m = { x: A.x + b.lx * z, y: A.y + Math.cos(ac.f * TAU) }, tilt = ac.f > 0.75 ? Math.sin((ac.f - 0.75) / 0.25 * Math.PI) : 0;
+    const gx = A.x - b.lx * 5 + b.fx * -2, gy = A.y - 6 + tilt * 2;
+    return { maos: [P_(m.x, m.y, b.atras), P_(gx, gy + 2, b.atras)], prop: g => {
+      g.save(); g.translate(m.x, m.y); g.rotate(z * 0.2); g.beginPath(); g.roundRect(-2.4, -1.8, 4.8, 3.6, 1); g.fillStyle = '#9cc4de'; g.fill(); g.lineWidth = 0.8; g.strokeStyle = CONTORNO; g.stroke(); g.restore();
+      g.save(); g.translate(gx, gy); g.rotate(tilt * 1.6 * (b.lx >= 0 ? 1 : -1)); g.beginPath(); g.roundRect(-1.6, -4, 3.2, 5, 1); g.fillStyle = '#7a4a22'; g.fill(); g.lineWidth = 0.8; g.strokeStyle = CONTORNO; g.stroke(); g.fillStyle = '#e8e2d0'; g.fillRect(-0.8, -5.2, 1.6, 1.3); g.restore();
+      if (tilt > 0.4) for (let k = 0; k < 2; k++) { circulo(g, lerp(gx, A.x, 0.4 + k * 0.3), lerp(gy, A.y, 0.4 + k * 0.3), 0.7); g.fillStyle = '#cfe8ff'; g.fill(); } } }; },
+  // 15: infecção: pasta de ervas tirada da tigela e aplicada em toques
+  tratarInfeccao: (ac, b) => { const A = alvoL(ac, b), f = ac.f, tg = { x: -b.lx * 3 + b.fx * 3, y: 6 + b.fy * 3 };
+    const m = f < 0.35 ? { x: lerp(tg.x, A.x, suave(f / 0.35)), y: lerp(tg.y, A.y, suave(f / 0.35)) - Math.sin(f / 0.35 * Math.PI) * 3 } : f < 0.65 ? { x: A.x + Math.cos(f * 40) * 1.2, y: A.y + Math.sin(f * 40) * 0.6 } : { x: lerp(A.x, tg.x, suave((f - 0.65) / 0.35)), y: lerp(A.y, tg.y, suave((f - 0.65) / 0.35)) };
+    return { maos: [P_(m.x, m.y, b.atras), P_(tg.x, tg.y + 1.5, b.atras)], prop: g => {
+      elipse(g, tg.x, tg.y, 3.4, 1.8); g.fillStyle = '#8a5a30'; g.fill(); g.lineWidth = 0.8; g.strokeStyle = CONTORNO; g.stroke(); elipse(g, tg.x, tg.y - 0.4, 2.4, 0.9); g.fillStyle = '#6f9a3a'; g.fill();
+      const n = Math.floor((ac.k || 0) * 6); for (let k = 0; k < n; k++) { circulo(g, A.x + Math.cos(k * 2.4) * 1.8, A.y + Math.sin(k * 2.4), 0.8); g.fillStyle = '#7fae45'; g.fill(); }
+      if (f < 0.35 || f > 0.65) { circulo(g, m.x, m.y - 1.2, 0.8); g.fillStyle = '#7fae45'; g.fill(); } } }; },
+  // 16: examinar: dois dedos no pescoço, contando o pulso (coração pulsa)
+  examinar: (ac, b) => { const A = alvoL(ac, b), bt = Math.max(0, Math.sin(ac.f * TAU * 2)) ** 4; return { maos: [P_(A.x, A.y + bt * 0.4, b.atras), P_(b.lx * 2 + b.fx * 3, 0.5 + b.fy * 3, b.atras)],
+    prop: g => { const s = 1 + bt * 0.5; g.save(); g.translate(A.x, A.y - 9); g.scale(s, s); g.beginPath(); g.moveTo(0, 1.8); g.bezierCurveTo(-3.4, -0.6, -1.6, -3.4, 0, -1.4); g.bezierCurveTo(1.6, -3.4, 3.4, -0.6, 0, 1.8); g.fillStyle = '#e04848'; g.fill(); g.lineWidth = 0.6; g.strokeStyle = CONTORNO; g.stroke(); g.restore(); } }; },
+  // 17: ajudar a sentar (mãos nas costas, empurra para cima)
+  ajudarSentar: (ac, b) => { const A = alvoL(ac, b), k = suave(ac.k || 0); return { maos: [P_(A.x - b.lx * 3, A.y + 2 - k * 5, b.atras), P_(A.x + b.lx * 3, A.y + 2 - k * 5, b.atras)] }; },
+  // 20: cuidar na cama, sentado num banquinho
+  tratarNaCama: (ac, b) => { const A = alvoL(ac, b), a = ac.f * TAU * 0.5; return { maos: [P_(A.x + Math.cos(a) * 2, A.y + Math.sin(a * 2) * 1, b.atras), P_(A.x - b.lx * 3 + Math.sin(a) * 1.2, A.y + 1.5, b.atras)] }; },
+  // carregar
+  carregar_ombro: (ac, b) => { const k = ac.k ?? 1, A = alvoL(ac, b, 14); return { maos: [P_(lerp(A.x, -b.lx * 3, k), lerp(A.y, -6, k), false), P_(lerp(A.x + b.lx * 3, b.lx * 4.5, k), lerp(A.y, -3.5, k), false)] }; },
+  carregar_colo: (ac, b) => { const k = ac.k ?? 1, A = alvoL(ac, b, 14); return { maos: [P_(lerp(A.x - b.lx * 3, b.fx * 6 - b.lx * 4.5, k), lerp(A.y, 5 + b.fy * 6, k), b.atras), P_(lerp(A.x + b.lx * 3, b.fx * 6 + b.lx * 4.5, k), lerp(A.y, 5 + b.fy * 6, k), b.atras)] }; },
+  carregar_arrastar: (ac, b) => { const sw = Math.sin(ac.f * TAU) * 0.6; return { maos: [P_(b.fx * 8 - b.lx * 2, 9 + b.fy * 8 + sw, b.atras), P_(b.fx * 8 + b.lx * 2, 9 + b.fy * 8 - sw, b.atras)] }; },
+  carregar_apoio: (ac, b) => { const A = alvoL(ac, b, 13), sw = Math.sin(ac.f * TAU) * 2; return { maos: [P_(A.x, A.y, false), P_(-Math.sign(b.lx || 1) * 0 + (A.x > 0 ? -1 : 1) * b.lx * 8 + b.fx * sw, 8 + b.fy * sw, b.atras)] }; },
+  carregar_cavalinho: (ac, b) => ({ maos: [P_(-b.lx * 6.5 - b.fx * 3, 10 - b.fy * 3, b.co > -0.25), P_(b.lx * 6.5 - b.fx * 3, 10 - b.fy * 3, b.co > -0.25)] }),
+  // armas
+  espada: (ac, b) => { const f = ac.f; let a = f < 0.45 ? lerp(0, -1.4, suave(f / 0.45)) : f < 0.62 ? lerp(-1.4, 1.5, ((f - 0.45) / 0.17) ** 1.4) : lerp(1.5, 0, suave((f - 0.62) / 0.38));
+    const d = { x: b.fx * Math.cos(a) + b.lx * Math.sin(a), y: b.fy * Math.cos(a) + b.ly * Math.sin(a) - 0.25 }, sh = { x: b.lx * 2.5, y: 3 + b.ly * 2.5 }, R = 5.5;
+    const m = { x: sh.x + d.x * R, y: sh.y + d.y * R };
+    return { maos: [P_(m.x, m.y, b.atras), P_(-b.lx * 6 + b.fx * 2, 8 - b.ly * 6, b.atras)], ferr: { tipo: 'espada', x0: m.x, y0: m.y, x1: m.x + d.x * 14, y1: m.y + d.y * 14, d, atras: b.atras, rastro: f > 0.45 && f < 0.68 } }; },
+  arco: (ac, b) => { const f = ac.f, pux = f < 0.55 ? suave(f / 0.55) : f < 0.78 ? 1 : Math.max(0, 1 - (f - 0.78) / 0.05), carregado = f < 0.78 || f > 0.9;
+    const mb = { x: b.fx * 8.5 - b.lx * 1, y: 5 + b.fy * 8.5 - 1.5 }, ms = { x: mb.x - b.fx * (2 + 6.5 * pux), y: mb.y - b.fy * (2 + 6.5 * pux) };
+    return { maos: [P_(mb.x, mb.y, b.atras), P_(ms.x, ms.y, b.atras)], ferr: { tipo: 'arco', x0: mb.x, y0: mb.y, x1: ms.x, y1: ms.y, d: { x: b.fx, y: b.fy }, l: { x: b.lx, y: b.ly }, carregado, atras: b.atras } }; },
+};
+// ação de cada animação (ritmo do ciclo; sem "golpes" = sem impacto)
+Object.assign(ACOES, {
+  tratarPerna: { ritmo: 1.4, golpes: [] }, tratarPe: { ritmo: 1.1, golpes: [] }, tratarBraco: { ritmo: 1.3, golpes: [] }, tratarMao: { ritmo: 1.2, golpes: [] }, tratarCabeca: { ritmo: 0.9, golpes: [] }, tratarTorso: { ritmo: 1.0, golpes: [] },
+  bandagemPerna: { ritmo: 1.6, golpes: [] }, bandagemBraco: { ritmo: 1.7, golpes: [] }, bandagemCabeca: { ritmo: 1.1, golpes: [] }, bandagemTorso: { ritmo: 0.9, golpes: [] },
+  talaPerna: { ritmo: 1.5, golpes: [] }, talaBraco: { ritmo: 1.5, golpes: [] }, pressionar: { ritmo: 1.2, golpes: [] }, limpar: { ritmo: 0.8, golpes: [] }, tratarInfeccao: { ritmo: 0.7, golpes: [] },
+  examinar: { ritmo: 0.6, golpes: [] }, ajudarSentar: { ritmo: 0.5, golpes: [] }, tratarNaCama: { ritmo: 0.7, golpes: [] },
+  espada: { ritmo: 1.1, golpes: [0.55] }, arco: { ritmo: 0.55, golpes: [0.78] },
+});
+function desenharArma(g, f) {
+  const n = Math.hypot(f.d.x, f.d.y) || 1, ux = f.d.x / n, uy = f.d.y / n, px = -uy, py = ux;
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  if (f.tipo === 'espada') {
+    if (f.rastro && Q.nivel > 0) { g.beginPath(); g.moveTo(f.x0 + ux * 4, f.y0 + uy * 4); g.lineTo(f.x1, f.y1); g.lineWidth = 6; g.strokeStyle = 'rgba(255,255,245,.18)'; g.stroke(); }
+    g.beginPath(); g.moveTo(f.x0 - ux * 2.5, f.y0 - uy * 2.5); g.lineTo(f.x0 + ux * 1, f.y0 + uy * 1); g.lineWidth = 3; g.strokeStyle = CONTORNO; g.stroke(); g.lineWidth = 1.8; g.strokeStyle = '#6a4a2a'; g.stroke();
+    g.beginPath(); g.moveTo(f.x0 + ux * 1.2 - px * 3, f.y0 + uy * 1.2 - py * 3); g.lineTo(f.x0 + ux * 1.2 + px * 3, f.y0 + uy * 1.2 + py * 3); g.lineWidth = 3; g.strokeStyle = CONTORNO; g.stroke(); g.lineWidth = 1.8; g.strokeStyle = '#c9a640'; g.stroke();
+    g.beginPath(); g.moveTo(f.x0 + ux * 1.5 - px * 1.2, f.y0 + uy * 1.5 - py * 1.2); g.lineTo(f.x1, f.y1); g.lineTo(f.x0 + ux * 1.5 + px * 1.2, f.y0 + uy * 1.5 + py * 1.2); g.closePath();
+    g.fillStyle = '#d7dbe0'; g.fill(); g.lineWidth = 1; g.strokeStyle = CONTORNO; g.stroke();
+    g.beginPath(); g.moveTo(f.x0 + ux * 2, f.y0 + uy * 2); g.lineTo(f.x1 - ux * 2, f.y1 - uy * 2); g.lineWidth = 0.6; g.strokeStyle = '#ffffff'; g.stroke();
+  } else if (f.tipo === 'arco') {
+    const lx = f.l.x, ly = f.l.y, R = 7.5;
+    const a = { x: f.x0 + lx * R - ux * 1.5, y: f.y0 + ly * R - uy * 1.5 }, b = { x: f.x0 - lx * R - ux * 1.5, y: f.y0 - ly * R - uy * 1.5 };
+    g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(f.x1, f.y1); g.lineTo(b.x, b.y); g.lineWidth = 0.6; g.strokeStyle = '#efe6cc'; g.stroke();
+    g.beginPath(); g.moveTo(a.x, a.y); g.quadraticCurveTo(f.x0 + ux * 4, f.y0 + uy * 4, b.x, b.y); g.lineWidth = 2.8; g.strokeStyle = CONTORNO; g.stroke(); g.lineWidth = 1.7; g.strokeStyle = '#9a6a3a'; g.stroke();
+    if (f.carregado) { g.beginPath(); g.moveTo(f.x1, f.y1); g.lineTo(f.x0 + ux * 5, f.y0 + uy * 5); g.lineWidth = 1.1; g.strokeStyle = '#6a4a2a'; g.stroke();
+      g.beginPath(); g.moveTo(f.x0 + ux * 5.5, f.y0 + uy * 5.5); g.lineTo(f.x0 + ux * 3.5 + px * 1.2, f.y0 + uy * 3.5 + py * 1.2); g.lineTo(f.x0 + ux * 3.5 - px * 1.2, f.y0 + uy * 3.5 - py * 1.2); g.closePath(); g.fillStyle = '#b9bdc2'; g.fill(); }
+  }
+}
+function desenharEscudo(g, x, y, r) {
+  circulo(g, x, y, r); g.fillStyle = '#8a5a30'; g.fill(); g.lineWidth = 1.6; g.strokeStyle = CONTORNO; g.stroke();
+  g.save(); g.clip(); g.beginPath(); for (const o of [-r * 0.35, r * 0.35]) { g.moveTo(x + o, y - r); g.lineTo(x + o, y + r); } g.lineWidth = 0.7; g.strokeStyle = 'rgba(40,20,5,.55)'; g.stroke(); g.restore();
+  circulo(g, x, y, r - 0.8); g.lineWidth = 1.1; g.strokeStyle = '#a8adb3'; g.stroke();
+  circulo(g, x, y, r * 0.3); g.fillStyle = '#c9cdd1'; g.fill(); g.lineWidth = 0.8; g.strokeStyle = CONTORNO; g.stroke();
+}
+function desenharEscudoNoColono(g, p, maos, lx, ly, fx, fy) {
+  const bl = p.bloqueio || 0, m = maos[0];
+  const x = lerp(m.x - lx * 1.5, fx * 7, bl), y = lerp(m.y - 1, 3 + fy * 7, bl);
+  desenharEscudo(g, x, y, 5.2 + bl * 1.2);
+}
+// curativos permanentes por cima do corpo do paciente (bandagem, tala, sangue)
+function curativosDe(c) {
+  const l = []; if (!c.saude) return l;
+  for (const f of c.saude.feridas) { if (f.tala) l.push({ parte: f.parte, tipo: 'tala' }); if (f.band || (f.trat && f.tipo !== 'contusao')) l.push({ parte: f.parte, tipo: f.band ? 'band' : 'pano' }); else if (f.sangra > 0) l.push({ parte: f.parte, tipo: 'sangue' }); if (f.infec > 0.15) l.push({ parte: f.parte, tipo: 'infec' }); }
+  return l;
+}
+function desenharCurativos(g, cur, maos, lx, ly, bw) {
+  for (const k of cur) {
+    const P = PARTES[k.parte], gr = P.g, sd = P.lado || 0;
+    let x = 0, y = 5, rx = 3, ry = 1.2;
+    if (gr === 'cabeca') { y = k.parte === 'pescoco' ? -0.5 : -9.5; rx = k.parte === 'pescoco' ? 4 : 8.4; ry = k.parte === 'pescoco' ? 1.2 : 2.6; }
+    else if (gr === 'torso') { y = 4; rx = bw; ry = 2.4; }
+    else if (gr === 'mao') { const m = maos[sd > 0 ? 1 : 0]; x = m.x; y = m.y; rx = 2.6; ry = 1.4; }
+    else if (gr === 'braco') { const m = maos[sd > 0 ? 1 : 0]; x = lerp(lx * sd * bw * 0.8, m.x, 0.55); y = lerp(3, m.y, 0.55); rx = 2.4; ry = 1.2; }
+    else { x = lx * sd * 3; y = gr === 'pe' ? 12 : 10; rx = 2.6; ry = 1.2; }
+    if (k.tipo === 'sangue') { circulo(g, x, y, 1.6); g.fillStyle = 'rgba(150,10,10,.85)'; g.fill(); continue; }
+    if (k.tipo === 'infec') { circulo(g, x + 1, y - 0.5, 2); g.fillStyle = 'rgba(120,170,40,.55)'; g.fill(); continue; }
+    if (k.tipo === 'tala') { g.beginPath(); g.moveTo(x - 1.6, y - 4); g.lineTo(x - 1.6, y + 3); g.moveTo(x + 1.6, y - 4); g.lineTo(x + 1.6, y + 3); g.lineWidth = 2.2; g.strokeStyle = CONTORNO; g.stroke(); g.lineWidth = 1.3; g.strokeStyle = '#b07d4b'; g.stroke(); continue; }
+    g.save(); elipse(g, x, y, rx, ry); g.lineWidth = 2.4; g.strokeStyle = CONTORNO; g.stroke(); g.lineWidth = 1.5; g.strokeStyle = k.tipo === 'band' ? '#f4f1e8' : '#cdb89a'; g.stroke();
+    if (k.tipo === 'band' && gr === 'cabeca' && k.parte === 'cabeca') { circulo(g, x + 4, y + 0.5, 0.9); g.fillStyle = '#c02828'; g.fill(); }
+    g.restore();
+  }
+}
+/* ---- pose especial de um colono (deitado, carregado, médico, carregando, caçando) ---- */
+const LOCAL_PARTE = { cabeca: [0, -8], pescoco: [0, -1.5], torso: [0, 5], bracoE: [-7, 3], bracoD: [7, 3], maoE: [-8.4, 8], maoD: [8.4, 8], pernaE: [-3, 10], pernaD: [3, 10], peE: [-3, 12.5], peD: [3, 12.5] };
+const quedaBounce = k => k < 0.7 ? suave(k / 0.7) : 1 + Math.sin((k - 0.7) / 0.3 * Math.PI) * 0.06;
+function kAnim(an) { return clamp((an.t + (estado.pausado ? 0 : alphaSim / CONFIG.SIM_HZ * estado.velocidade)) / an.dur, 0, 1); }
+function medicoDe(p) { return colonos.find(m => m.tarefa && m.tarefa.tipo === 'tratar' && m.tarefa.paciente === p && m.tarefa.fase === 'fazendo'); }
+function poseDeitada(p) {
+  if (!p.saude || p.carregadoPor) return null;
+  const t = p.tarefa, an = p.anim, s = p.saude, H = Math.PI / 2;
+  if (an) { const k = kAnim(an);
+    if (an.tipo === 'desmaiar') return { ang: -H * quedaBounce(k), dx: 0, dy: k < 0.35 ? k * 6 : 2.1 };
+    if (an.tipo === 'deitar') return an.naCama ? { cama: true, entra: 1 - k } : { ang: -H * suave(k), dx: 0, dy: 2 * k };
+    if (an.tipo === 'levantar') { if (an.daCama) return { cama: true, sentado: 1, sair: k }; return k < 0.5 ? { ang: lerp(-H, -0.6, suave(k / 0.5)), dx: 0, dy: 2, apoia: 1 } : { ang: lerp(-0.6, 0, suave((k - 0.5) / 0.5)), dx: 0, dy: lerp(2, 0, (k - 0.5) / 0.5), apoia: 1 - (k - 0.5) * 2 }; }
+  }
+  if (t && t.tipo === 'repousar' && t.fase === 'deitado' && t.camaReal) { const m = medicoDe(p); return { cama: true, sentado: p.sentado ? 1 : (m && m.tarefa.anim === 'ajudarSentar' ? suave(clamp(m.tarefa.progresso / m.tarefa.total, 0, 1)) : 0) }; }
+  if (s.caido || p.deitarTrat || (t && t.tipo === 'repousar' && t.fase === 'deitado')) return { ang: -H, dx: 0, dy: 2 };
+  return null;
+}
+function posParteMundo(p, parte) {
+  const [u, v] = LOCAL_PARTE[parte] || [0, 5];
+  const bx = (p.rx ?? p.x) * T + T / 2, by = (p.ry ?? p.y) * T + T / 2, pd = poseDeitada(p);
+  if (pd) { if (pd.cama) return { x: bx + u, y: by - 5 - (pd.sentado || 0) * 4 + v }; const ca = Math.cos(pd.ang), sa = Math.sin(pd.ang); return { x: bx + pd.dx + u * ca - v * sa, y: by + pd.dy + u * sa + v * ca }; }
+  const yaw = p.yawVis || 0, co = Math.cos(yaw), s = Math.sin(yaw);
+  return { x: bx + co * u, y: by + v - s * 0.5 * u };
+}
+function extrasFerido(c) {
+  const ex = {}; if (!c.saude) return ex;
+  const v = c.vis || {};
+  if (c.saude.feridas.length) {
+    const pn = piorEm(c, ['perna', 'pe']); if (pn.w > 0.12) ex.manca = (PARTES[pn.f.parte].lado || 1) * clamp(pn.w * 1.6, 0.3, 1.3);
+    const br = piorEm(c, ['braco', 'mao']); if (br.w > 0.3) ex.bracoMole = PARTES[br.f.parte].lado || 1;
+    ex.curativos = curativosDe(c);
+  }
+  if (v.careta > 0) { ex.careta = v.careta; ex.fechados = v.careta > 0.35; }
+  if (c.escudo) ex.escudo = true;
+  if (v.bloqueio > 0) ex.bloqueio = Math.sin(clamp(v.bloqueio / 0.5, 0, 1) * Math.PI) ;
+  if (c.agachado) ex.agacha = 1;
+  return ex;
+}
+function desenharCarregado(p, X, Y, ang, esc, ex) {
+  ctx.save(); ctx.translate(X, Y); ctx.rotate(ang); ctx.scale(esc, esc);
+  desenharColono(ctx, p, 0, 0, Object.assign({ yaw: 0, fechados: saude(p).inconsciente, curativos: curativosDe(p), respira: Math.sin(tempoReal * 2) * 0.3 }, ex));
+  ctx.restore();
+}
+function prepararPose(c, x, y) {
+  if (!c.saude || c.visitante) return null;
+  const ex = extrasFerido(c);
+  // carregado por alguém: quem carrega desenha (menos no apoio, em que anda junto)
+  if (c.carregadoPor) {
+    const tc = c.carregadoPor.tarefa;
+    if (tc && tc.estilo === 'apoio') { const car = c.carregadoPor, cx = car.rx * T + T / 2, cy = car.ry * T + T / 2;
+      ex.maosExtra = (m, b) => { const lado = (cx - x) * b.lx + (cy - y) * b.ly > 0 ? 1 : 0, d = { x: cx - x, y: cy - 2 - y }, L = Math.hypot(d.x, d.y) || 1, R = Math.min(L, 11); const r = m.slice(); r[lado] = { x: d.x / L * R, y: d.y / L * R, atras: false }; return r; };
+      ex.manca = ex.manca || 1; return { extra: ex }; }
+    return { feito: true };
+  }
+  const pd = poseDeitada(c);
+  if (pd) {
+    const s = c.saude, resp = Math.sin(tempoReal * 1.5) * 0.4, fech = s.inconsciente || (s.caido && !pd.sentado);
+    const base = { yaw: 0, fechados: fech || ex.fechados, respira: resp, curativos: ex.curativos, careta: s.inconsciente ? 0 : ex.careta, escudo: false };
+    if (pd.cama) {
+      const sy = pd.sentado || 0, sair = pd.sair || 0, entra = pd.entra || 0;
+      ctx.save(); ctx.translate(x, y - 5 - sy * 4 + sair * 11 + entra * 8);
+      desenharColono(ctx, c, 0, 0, Object.assign(base, { semPes: true }));
+      ctx.restore();
+      const al = 1 - clamp(Math.max(sair, entra) / 0.7, 0, 1);
+      if (al > 0) { ctx.save(); ctx.globalAlpha = al;
+        ctx.beginPath(); ctx.roundRect(x - 11, y - 1 + sy * 5, 22, 15 - sy * 4, 3); ctx.fillStyle = '#d4e3ee'; ctx.fill(); ctx.lineWidth = 1.2; ctx.strokeStyle = CONTORNO; ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x - 11, y + 2 + sy * 5); ctx.lineTo(x + 11, y + 2 + sy * 5); ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.stroke();
+        ctx.fillStyle = '#c62828'; ctx.fillRect(x + 3.2, y + 5.5 + sy * 3, 6, 2); ctx.fillRect(x + 5.2, y + 3.5 + sy * 3, 2, 6); ctx.restore(); }
+    } else {
+      ctx.save(); ctx.translate(x + pd.dx, y + pd.dy); ctx.rotate(pd.ang);
+      if (pd.apoia) base.maosExtra = (m, b) => [{ x: -9, y: 9 + 2 * pd.apoia, atras: false }, { x: 9, y: 9 + 2 * pd.apoia, atras: false }];
+      desenharColono(ctx, c, 0, 0, base);
+      ctx.restore();
+    }
+    return { feito: true };
+  }
+  const t = c.tarefa;
+  // médico tratando: mãos vão até a parte ferida do paciente
+  const med = t && ((t.tipo === 'tratar' && t.fase === 'fazendo') || (t.tipo === 'resgatar' && t.fase === 'estabilizar')) ? t : null;
+  if (med && med.paciente) {
+    const p = med.paciente, an = med.anim || 'pressionar', f = med.f;
+    const parte = an === 'examinar' ? 'pescoco' : an === 'ajudarSentar' ? 'torso' : an === 'tratarNaCama' ? (f ? f.parte : 'torso') : f ? f.parte : 'torso';
+    const pw = posParteMundo(p, parte);
+    const ajoelha = ['tratarPerna', 'bandagemPerna', 'talaPerna', 'tratarTorso', 'bandagemTorso', 'pressionar', 'ajudarSentar', 'limpar', 'tratarInfeccao', 'examinar'].includes(an) && (pacienteDeitado(p) || ['tratarPerna', 'bandagemPerna', 'talaPerna'].includes(an)) ? 1 : an === 'tratarPe' ? 1.3 : 0;
+    Object.assign(ex, { ajoelha: Math.min(ajoelha, 1.3), sentado: an === 'tratarNaCama' ? 1 : 0, escudo: false });
+    const acao = { tipo: an, f: c.rAcaoF || 0, k: clamp(med.progresso / (med.total || 1), 0, 1), alvo: { x: pw.x - x, y: pw.y - y } };
+    const antes = an === 'tratarNaCama' ? () => { const bx = x - Math.sin(c.yawVis || 0) * 2, by = y + 8; ctx.beginPath(); ctx.roundRect(bx - 5, by - 2, 10, 5, 1.5); ctx.fillStyle = '#8a5a30'; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = CONTORNO; ctx.stroke(); } : null;
+    return { extra: ex, acao, antes };
+  }
+  // carregando alguém
+  if (t && t.tipo === 'resgatar' && ['pegando', 'levando', 'soltando'].includes(t.fase)) {
+    const p = t.paciente; if (!p) return { extra: ex };
+    const k = t.fase === 'pegando' ? clamp(t.t / 0.9, 0, 1) : t.fase === 'soltando' ? 1 - clamp(t.t / 0.9, 0, 1) : 1, e = suave(k);
+    const yaw = c.yawVis || 0, s = Math.sin(yaw), co = Math.cos(yaw), lx = co, ly = -s * 0.5, fx = s, fy = co * 0.55;
+    const gx = (p.rx ?? p.x) * T + T / 2, gy = (p.ry ?? p.y) * T + T / 2 + 2;
+    const fase = ((c.rdist / CICLO_PASSO) % 1 + 1) % 1, sw = Math.sin(fase * TAU) * 0.8;
+    ex.escudo = false; ex.ajoelha = t.fase !== 'levando' && t.estilo !== 'apoio' ? Math.sin(k * Math.PI) * 0.9 + (1 - k) * 0.4 : 0;
+    const acao = { tipo: 'carregar_' + t.estilo, f: fase, k: e, alvo: { x: gx - x, y: gy - y } };
+    const pex = { fechados: saude(p).inconsciente };
+    const H = Math.PI / 2;
+    if (t.estilo === 'ombro') {
+      const sx = x + lx * 2, sy = y - 12 + sw * 0.5, X = lerp(gx, sx, e), Y = lerp(gy, sy, e) - Math.sin(e * Math.PI) * 6, A = -H * (co >= 0 ? 1 : -1) * lerp(1, 0.92, e);
+      const d = () => desenharCarregado(p, X, Y, A, lerp(1, 0.9, e), Object.assign(pex, { semPes: false, maosExtra: (m) => [{ x: -6, y: 13 + sw, atras: false }, { x: -4, y: 14 - sw, atras: false }] }));
+      return e < 0.35 ? { extra: ex, acao, antes: d } : { extra: ex, acao, depois: d };
+    }
+    if (t.estilo === 'colo') {
+      const fxp = x + fx * 5, fyp = y - 2 + fy * 5, X = lerp(gx, fxp, e), Y = lerp(gy, fyp, e) - Math.sin(e * Math.PI) * 4, A = lerp(-H, -H + 0.15 * Math.sign(lx || 1), e);
+      const d = () => desenharCarregado(p, X, Y, A, lerp(1, 0.86, e), Object.assign(pex, { maosExtra: (m) => [{ x: -3, y: 2, atras: false }, m[1]] }));
+      return co < -0.25 ? { extra: ex, acao, antes: d } : { extra: ex, acao, depois: d };
+    }
+    if (t.estilo === 'arrastar') {
+      const A = Math.atan2(x - gx, -(y - gy));
+      const d = () => desenharCarregado(p, gx, gy, A, 1, Object.assign(pex, { maosExtra: () => [{ x: -2.5, y: lerp(9, -15, e), atras: false }, { x: 2.5, y: lerp(9, -15, e), atras: false }] }));
+      if (t.fase === 'levando' && Q.nivel > 0 && c.rvel > 0.3 && rndVis() < 0.25) particula('poeira', gx + rv(-4, 4), gy + 6, 1, rv(-5, 5), rv(-3, 3), 3, 0.6, { g: 0, tam: 2.5 });
+      return { extra: ex, acao, antes: d, dyaw: t.fase === 'pegando' ? 0 : Math.PI };
+    }
+    if (t.estilo === 'apoio') { acao.alvo = { x: gx - x, y: gy - 10 - y }; return { extra: Object.assign(ex, { manca: 0 }), acao }; }
+    if (t.estilo === 'cavalinho') {
+      const bx = x - fx * 3.5, by = y - 9 - fy * 3.5, X = lerp(gx, bx, e), Y = lerp(gy - 2, by, e) - Math.sin(e * Math.PI) * 4;
+      const d = () => { desenharCarregado(p, X, Y, 0, 0.95, Object.assign(pex, { yaw, semPes: e > 0.5, maosExtra: (m, b) => e > 0.5 ? [{ x: -b.lx * 5 + b.fx * 4, y: 6 + b.fy * 4, atras: false }, { x: b.lx * 5 + b.fx * 4, y: 6 + b.fy * 4, atras: false }] : m }));
+        if (e > 0.5) for (const sd of [-1, 1]) { elipse(ctx, x + lx * sd * 8.5 - fx * 1, y + 9 + ly * sd * 8.5, 2.3, 1.7); ctx.fillStyle = '#3b2d22'; ctx.fill(); ctx.lineWidth = 1.1; ctx.strokeStyle = CONTORNO; ctx.stroke(); } };
+      return co > -0.25 ? { extra: ex, acao, antes: d } : { extra: ex, acao, depois: d };
+    }
+  }
+  // paciente de pé estende o braço ferido para o médico
+  if (t && t.tipo === 'paciente' && t.medico && t.medico.tarefa && t.medico.tarefa.f) { const g = PARTES[t.medico.tarefa.f.parte]; if (g.g === 'braco' || g.g === 'mao') { ex.estende = g.lado || 1; delete ex.bracoMole; } }
+  // apoiando: a mão no ombro do paciente
+  if (t && t.tipo === 'resgatar' && t.fase === 'indo' && t.estilo === 'apoio') return { extra: ex };
+  return { extra: ex };
+}
+/* ---- animais (vista de cima, pernas animadas pelo passo) ---- */
+function corpoAnimal(g, esp, o) {
+  const E = ESP_ANIMAL[esp], F = (o.fase || 0) * TAU, w = o.w || 0, morte = o.morte || 0, corre = o.corre;
+  const L = E.L * (1 + (corre ? Math.sin(F * 2) * 0.08 : 0)), W = E.W, cab = esp === 'urso' ? 5.6 : esp === 'lobo' ? 4.2 : 3.8;
+  g.lineJoin = 'round'; g.lineCap = 'round';
+  // pernas: passo alternado; galope = pares em sincronia
+  const pernas = [[1, -1, 0], [1, 1, Math.PI], [-1, -1, corre ? 0.4 : Math.PI], [-1, 1, corre ? 0.4 : 0]];
+  for (const [fr, sd, ph] of pernas) {
+    let px = fr * L * 0.33, py = sd * W * 0.85;
+    if (morte) { py = sd * (W + 4.5 * morte); px += fr * 2 * morte; }
+    else { px += Math.sin(F + ph) * (corre ? 4.2 : 2.6) * w; py += sd * Math.max(0, Math.cos(F + ph)) * 0.6 * w; }
+    g.beginPath(); g.moveTo(fr * L * 0.3, sd * W * 0.45); g.lineTo(px, py); g.lineWidth = esp === 'urso' ? 4.4 : 2.6; g.strokeStyle = CONTORNO; g.stroke(); g.lineWidth = esp === 'urso' ? 3 : 1.5; g.strokeStyle = E.escuro; g.stroke();
+    circulo(g, px, py, esp === 'urso' ? 2.4 : 1.4); g.fillStyle = esp === 'veado' ? '#3a2a1a' : E.escuro; g.fill(); g.lineWidth = 0.8; g.strokeStyle = CONTORNO; g.stroke();
+  }
+  // cauda
+  const ca = Math.sin(o.t * (esp === 'lobo' ? 5 : 3)) * 0.35 * (1 - morte);
+  g.save(); g.translate(-L / 2, 0); g.rotate(Math.PI + ca);
+  if (esp === 'lobo') { elipse(g, 4.2, 0, 4.6, 1.9); g.fillStyle = E.cor; g.fill(); g.lineWidth = 1.1; g.strokeStyle = CONTORNO; g.stroke(); elipse(g, 7.4, 0, 1.6, 1.2); g.fillStyle = E.claro; g.fill(); }
+  else if (esp === 'veado') { elipse(g, 1.6, 0, 2, 1.6); g.fillStyle = '#f4efe6'; g.fill(); g.lineWidth = 0.9; g.strokeStyle = CONTORNO; g.stroke(); }
+  else { circulo(g, 1.2, 0, 1.7); g.fillStyle = E.cor; g.fill(); g.lineWidth = 0.9; g.strokeStyle = CONTORNO; g.stroke(); }
+  g.restore();
+  // corpo
+  elipse(g, 0, 0, L / 2, W); g.fillStyle = E.cor; g.fill();
+  g.save(); g.clip(); elipse(g, 0, W * 0.55, L / 2, W * 0.55); g.fillStyle = 'rgba(0,0,0,.18)'; g.fill();
+  if (esp === 'lobo') { elipse(g, -1, -W * 0.25, L * 0.4, W * 0.35); g.fillStyle = E.escuro; g.fill(); }
+  if (esp === 'veado') for (const [sx, sy] of [[-3, -1.5], [0, -2.2], [3, -1.2], [-1.2, 0.3]]) { circulo(g, sx, sy, 0.7); g.fillStyle = 'rgba(255,245,225,.75)'; g.fill(); }
+  if (esp === 'urso') { elipse(g, -2, -W * 0.3, L * 0.3, W * 0.4); g.fillStyle = 'rgba(255,255,255,.08)'; g.fill(); }
+  g.restore(); elipse(g, 0, 0, L / 2, W); g.lineWidth = 1.5; g.strokeStyle = CONTORNO; g.stroke();
+  if (o.flash) { elipse(g, 0, 0, L / 2, W); g.fillStyle = `rgba(255,255,255,${o.flash})`; g.fill(); }
+  // cabeça (abaixa para pastar, avança no ataque)
+  const pasta = o.pasta || 0, atk = o.atk || 0;
+  const hx = L / 2 + cab * 0.55 + pasta * 2 + Math.sin(atk * Math.PI) * 4, hy = Math.sin(o.t * 9) * 0.5 * pasta;
+  g.save(); g.translate(hx, hy); g.scale(1 - pasta * 0.12, 1 - pasta * 0.12);
+  if (esp === 'veado' && o.chifre && !pasta) { g.beginPath(); for (const sd of [-1, 1]) { g.moveTo(-1, sd * 1.5); g.lineTo(-4.5, sd * 4.5); g.lineTo(-7, sd * 4); g.moveTo(-4.5, sd * 4.5); g.lineTo(-5.5, sd * 7); } g.lineWidth = 1.6; g.strokeStyle = CONTORNO; g.stroke(); g.lineWidth = 0.9; g.strokeStyle = '#d9c9a0'; g.stroke(); }
+  for (const sd of [-1, 1]) { g.beginPath(); const ex = esp === 'urso' ? 1.5 : 0; g.moveTo(-1.5, sd * (cab * 0.5)); g.lineTo(-3.2 - ex, sd * (cab * 0.95 + ex)); g.lineTo(0.2, sd * (cab * 0.8)); g.closePath(); g.fillStyle = esp === 'veado' ? E.escuro : E.cor; g.fill(); g.lineWidth = 1; g.strokeStyle = CONTORNO; g.stroke(); }
+  elipse(g, 0, 0, cab, cab * 0.85); g.fillStyle = E.cor; g.fill(); g.lineWidth = 1.3; g.strokeStyle = CONTORNO; g.stroke();
+  // focinho; lobo abre a boca no ataque
+  const boca = esp === 'lobo' ? Math.sin(atk * Math.PI) : 0;
+  if (boca > 0.1) { g.beginPath(); g.moveTo(cab * 0.6, 0); g.lineTo(cab + 3.2, -1.8 - boca * 1.6); g.lineTo(cab + 3.2, 1.8 + boca * 1.6); g.closePath(); g.fillStyle = '#7a1e1e'; g.fill(); g.lineWidth = 0.8; g.stroke(); }
+  elipse(g, cab * 0.85, 0, esp === 'urso' ? 2.6 : 2.4, esp === 'veado' ? 1.4 : 1.7); g.fillStyle = E.claro; g.fill(); g.lineWidth = 0.9; g.strokeStyle = CONTORNO; g.stroke();
+  circulo(g, cab * 0.85 + 2, 0, 0.8); g.fillStyle = '#16120e'; g.fill();
+  for (const sd of [-1, 1]) { if (morte > 0.5) { g.beginPath(); g.moveTo(0.4, sd * 1.6 - 0.6); g.lineTo(1.6, sd * 1.6 + 0.6); g.moveTo(1.6, sd * 1.6 - 0.6); g.lineTo(0.4, sd * 1.6 + 0.6); g.lineWidth = 0.6; g.strokeStyle = '#16120e'; g.stroke(); } else { circulo(g, 1, sd * 1.7, 0.6); g.fillStyle = esp === 'lobo' ? '#e9c64a' : '#16120e'; g.fill(); } }
+  g.restore();
+  // urso: patada (pata dianteira avança no golpe)
+  if (esp === 'urso' && atk > 0) { const e = Math.sin(atk * Math.PI), sd = 1; const px = L * 0.35 + e * 9, py = sd * (W * 0.8 + e * 2);
+    g.beginPath(); g.moveTo(L * 0.25, sd * W * 0.4); g.lineTo(px, py); g.lineWidth = 5; g.strokeStyle = CONTORNO; g.stroke(); g.lineWidth = 3.4; g.strokeStyle = E.escuro; g.stroke();
+    circulo(g, px, py, 3); g.fillStyle = E.escuro; g.fill(); g.lineWidth = 1; g.strokeStyle = CONTORNO; g.stroke();
+    if (e > 0.6) { g.beginPath(); for (let k = -1; k <= 1; k++) { g.moveTo(px + 2, py + k * 1.6); g.lineTo(px + 6, py + k * 2.4); } g.lineWidth = 0.9; g.strokeStyle = 'rgba(255,255,255,.7)'; g.stroke(); } }
+}
+function desenharAnimal(a, dtR) {
+  const E = ESP_ANIMAL[a.esp], x = a.rx * T + T / 2, y = a.ry * T + T / 2 + 4;
+  if (Q.nivel === 0) a.yawVis = YAW_DIR[dirDeYaw(a.yawAlvo)]; else a.yawVis += difAng(a.yawAlvo, a.yawVis) * Math.min(1, dtR * 8);
+  const s = Math.sin(a.yawVis), co = Math.cos(a.yawVis), ang = Math.atan2(co * 0.62, s);
+  const w = clamp(a.rvel / 2, 0, 1.3), fase = ((a.rdist / E.passo) % 1 + 1) % 1, corre = a.rvel > 3;
+  const morte = a.morto ? clamp(a.t / 0.6, 0, 1) : 0, v = a.vis || {};
+  const bob = corre ? Math.abs(Math.sin(fase * TAU)) * -2 : 0;
+  ctx.save(); ctx.translate(x, y);
+  elipse(ctx, 0, 6, E.L * 0.55, E.W * 0.75); ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fill();
+  ctx.translate(0, bob);
+  ctx.rotate(ang + morte * 0.5); ctx.scale(1, 1 - morte * 0.25);
+  corpoAnimal(ctx, a.esp, { fase, w, corre, morte, t: tempoReal + a.id, pasta: a.estado === 'pastar' && !a.morto ? 1 : 0, atk: a.atk || 0, chifre: a.chifre, flash: v.golpe > 0 ? v.golpe * 2 : 0 });
+  ctx.restore();
+  if (a.cacar && !a.morto) { ctx.save(); ctx.translate(x, y - E.W - 12); circulo(ctx, 0, 0, 4.5); ctx.lineWidth = 1.4; ctx.strokeStyle = '#e04848'; ctx.stroke(); ctx.beginPath(); ctx.moveTo(-7, 0); ctx.lineTo(-2, 0); ctx.moveTo(2, 0); ctx.lineTo(7, 0); ctx.moveTo(0, -7); ctx.lineTo(0, -2); ctx.moveTo(0, 2); ctx.lineTo(0, 7); ctx.stroke(); ctx.restore(); }
+  if (!a.morto && a.hp < E.hp) { const bw = 16; ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(x - bw / 2, y - E.W - 6, bw, 2.6); ctx.fillStyle = '#c94a3a'; ctx.fillRect(x - bw / 2, y - E.W - 6, bw * Math.max(0, a.hp / E.hp), 2.6); }
+  if (!a.morto && a.alerta > 0.45 && a.estado !== 'atacar') { ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(0,0,0,.8)'; const tx = a.alerta >= 1 ? '!' : '?'; ctx.strokeText(tx, x, y - E.W - 9); ctx.fillStyle = a.alerta >= 1 ? '#ffd770' : '#ddd'; ctx.fillText(tx, x, y - E.W - 9); }
+}
+/* ---- itens novos ---- */
+const SPR_ITEM_V8 = {};
+function desenharItemV8(g, it, cx, cy) {
+  const tp = it.tipo;
+  if (tp.startsWith('CARC_')) { const esp = tp.slice(5).toLowerCase(); g.save(); g.translate(cx, cy + 2); elipse(g, 0, 5, 12, 3.5); g.fillStyle = 'rgba(0,0,0,.25)'; g.fill(); g.rotate(-0.3); const k = esp === 'urso' ? 0.75 : 0.85; g.scale(k, k * 0.8); corpoAnimal(g, esp, { morte: 1, t: 0 }); g.restore(); return true; }
+  const sombra = (rx = 10) => { elipse(g, cx + 1, cy + 6, rx, 3); g.fillStyle = 'rgba(0,0,0,0.25)'; g.fill(); };
+  if (tp === 'ESPADA') { sombra(11); desenharArma(g, { tipo: 'espada', x0: cx - 7, y0: cy + 5, x1: cx + 8, y1: cy - 6, d: { x: 15, y: -11 } }); return true; }
+  if (tp === 'ARCO') { sombra(10); desenharArma(g, { tipo: 'arco', x0: cx + 2, y0: cy, x1: cx - 2, y1: cy, d: { x: 1, y: 0 }, l: { x: 0, y: 1 }, carregado: false }); return true; }
+  if (tp === 'ESCUDO') { sombra(8); desenharEscudo(g, cx, cy, 7); return true; }
+  if (tp === 'FLECHAS') { sombra(9); for (let k = -2; k <= 2; k++) { g.beginPath(); g.moveTo(cx - 8, cy + k * 1.6 + 2); g.lineTo(cx + 7, cy + k * 1.2 - 1); g.lineWidth = 1.8; g.strokeStyle = CONTORNO; g.stroke(); g.lineWidth = 0.9; g.strokeStyle = '#a8763f'; g.stroke(); circulo(g, cx + 7.5, cy + k * 1.2 - 1, 0.9); g.fillStyle = '#b9bdc2'; g.fill(); }
+    g.beginPath(); g.moveTo(cx - 9, cy - 2); g.lineTo(cx - 5, cy + 0); g.lineTo(cx - 9, cy + 6); g.closePath(); g.fillStyle = '#e8e2d0'; g.fill(); g.lineWidth = 0.7; g.strokeStyle = CONTORNO; g.stroke(); return true; }
+  if (tp === 'BANDAGEM') { sombra(9); for (const [ox, oy] of it.qtd > 3 ? [[-4, 1], [4, 1], [0, -3]] : [[0, 0]]) { elipse(g, cx + ox, cy + oy, 4.6, 3.6); g.fillStyle = '#f4f1e8'; g.fill(); g.lineWidth = 1.2; g.strokeStyle = CONTORNO; g.stroke(); elipse(g, cx + ox, cy + oy, 1.6, 1.3); g.fillStyle = '#cfc6b2'; g.fill(); }
+    g.fillStyle = '#c62828'; g.fillRect(cx + 5, cy - 7, 4.5, 1.6); g.fillRect(cx + 6.45, cy - 8.45, 1.6, 4.5); return true; }
+  if (tp === 'CARNE') { sombra(10); for (const [ox, oy, r] of [[-4, 1, 4.4], [3.5, 2, 4], [0, -2.5, 3.8]]) { g.beginPath(); poligonoIrregular(g, cx + ox, cy + oy, r, 7, mulberry32(it.x * 7 + ox * 13 + 1), 0.3); g.fillStyle = '#b8443a'; g.fill(); g.lineWidth = 1.1; g.strokeStyle = CONTORNO; g.stroke(); elipse(g, cx + ox - 1, cy + oy - 1, r * 0.4, r * 0.25); g.fillStyle = '#f2d6c8'; g.fill(); } return true; }
+  if (tp === 'PELE') { sombra(11); g.beginPath(); g.moveTo(cx - 9, cy - 3); g.quadraticCurveTo(cx - 3, cy - 7, cx + 2, cy - 4); g.quadraticCurveTo(cx + 9, cy - 6, cx + 9, cy + 1); g.quadraticCurveTo(cx + 6, cy + 6, cx, cy + 5); g.quadraticCurveTo(cx - 8, cy + 7, cx - 9, cy - 3); g.closePath();
+    g.fillStyle = '#9a7048'; g.fill(); g.lineWidth = 1.2; g.strokeStyle = CONTORNO; g.stroke(); g.beginPath(); g.moveTo(cx - 5, cy); g.quadraticCurveTo(cx, cy - 2, cx + 5, cy + 1); g.lineWidth = 0.7; g.strokeStyle = 'rgba(255,230,190,.5)'; g.stroke(); return true; }
+  return false;
+}
+function desenharPecaV8(g, cx, cy, tipo, frac, pulso) {
+  g.save(); g.translate(cx, cy); g.scale(1 + pulso * 0.14, 1 + pulso * 0.14);
+  const R = RECEITAS[tipo], saida = R && R.saida ? Object.keys(R.saida)[0] : tipo;
+  if (tipo.startsWith('CARNEAR')) { // carcaça vai diminuindo, carne e pele aparecem
+    const esp = tipo.slice(8).toLowerCase(); g.save(); g.globalAlpha = 1 - frac * 0.8; g.scale(0.55 * (1 - frac * 0.5), 0.45 * (1 - frac * 0.5)); corpoAnimal(g, esp, { morte: 1, t: 0 }); g.restore();
+    if (frac > 0.25) { g.save(); g.translate(7, 2); g.scale(0.55, 0.55); desenharItemV8(g, { tipo: 'CARNE', qtd: 1, x: 3, y: 0 }, 0, 0); g.restore(); }
+    if (frac > 0.6) { g.save(); g.translate(-7, 3); g.scale(0.5, 0.5); desenharItemV8(g, { tipo: 'PELE', qtd: 1, x: 0, y: 0 }, 0, 0); g.restore(); }
+  } else { g.globalAlpha = 0.35 + 0.65 * frac; const e = 0.6 + 0.4 * suave(frac); g.scale(e * 0.7, e * 0.7); desenharItemV8(g, { tipo: saida, qtd: 1, x: 0, y: 0 }, 0, 0) || desenharItem(g, { tipo: saida, qtd: 1, x: 0, y: 0 }, 0, 0); }
+  g.restore();
+}
+/* ---- sangue: respingos, gotas e manchas no chão (só visual) ---- */
+function respingo(tx, ty, k) {
+  const x = (tx + 0.5) * T, y = (ty + 0.5) * T + 6, n = Math.round((Q.nivel === 0 ? 3 : Q.nivel === 1 ? 6 : 10) * k);
+  for (let j = 0; j < n; j++) particula('sangue', x + rv(-3, 3), y - 4, rv(6, 12), rv(-50, 50), rv(-35, 35), rv(20, 70), 1.2, { tam: rv(0.8, 1.7) });
+  if (k > 0.3) manchas.push({ x: x + rv(-3, 3), y: y + rv(-2, 2), r: rv(3, 6) * k, t: 0, rot: rv(0, 6), sem: Math.floor(rv(1, 1e6)) });
+}
+function atualizarVisuaisV8(dt) {
+  for (const p of efeitos) if (p.tipo === 'sangue' && p.z <= 0 && !p.pousou) { p.pousou = true; p.vida = Math.min(p.vida, 0.05); manchas.push({ x: p.x, y: p.y, r: p.tam * 1.3, t: 0, rot: 0 }); }
+  for (let k = manchas.length - 1; k >= 0; k--) { manchas[k].t += dt; if (manchas[k].t > 50) manchas.splice(k, 1); }
+  if (manchas.length > 320) manchas.splice(0, manchas.length - 320);
+  for (const f of flechasChao) f.t += dt;
+  for (let k = flechasChao.length - 1; k >= 0; k--) if (flechasChao[k].t > 25) flechasChao.splice(k, 1);
+  if (!dt) return;
+  for (const c of seres()) {
+    const v = c.vis; if (v) { v.careta = Math.max(0, v.careta - dt * 1.6); v.golpe = Math.max(0, v.golpe - dt); v.bloqueio = Math.max(0, v.bloqueio - dt); }
+    let sangra = 0;
+    if (c.saude) for (const f of c.saude.feridas) sangra += f.sangra; else if (c.animal && !c.morto && c.hp < ESP_ANIMAL[c.esp].hp * 0.6) sangra = 5;
+    if (!sangra) continue;
+    const vv = visDe(c); vv.gota += dt * sangra / 6;
+    while (vv.gota >= 1) { vv.gota -= 1; const lying = c.saude && pacienteDeitado(c); const x = (c.rx ?? c.x) * T + T / 2 + rv(-4, 4), y = (c.ry ?? c.y) * T + T / 2 + (lying ? 4 : 8);
+      if (lying || c.carregadoPor) manchas.push({ x: x + rv(-5, 5), y: y + rv(-2, 3), r: rv(1.5, 3.2), t: 0, rot: 0 }); else particula('sangue', x, y, rv(8, 12), rv(-6, 6), rv(-4, 4), 0, 1, { tam: rv(0.7, 1.1) }); }
+  }
+}
+function desenharManchas(g) {
+  for (const m of manchas) {
+    const a = 0.75 * (1 - clamp((m.t - 30) / 20, 0, 1));
+    if (a <= 0) continue;
+    g.globalAlpha = a; elipse(g, m.x, m.y, m.r, m.r * 0.6, m.rot); g.fillStyle = '#6e0c0c'; g.fill();
+    if (m.r > 3 && Q.nivel > 0) { elipse(g, m.x - m.r * 0.2, m.y - m.r * 0.15, m.r * 0.4, m.r * 0.22, m.rot); g.fillStyle = '#9a1818'; g.fill(); }
+  }
+  g.globalAlpha = 1;
+}
+function desenharCombate(g) {
+  const vel = estado.pausado ? 0 : estado.velocidade;
+  for (const f of flechasChao) { g.globalAlpha = 1 - clamp((f.t - 18) / 7, 0, 1); const x = (f.x + 0.5) * T, y = (f.y + 0.5) * T + 4;
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x - Math.cos(f.ang) * 7, y - Math.sin(f.ang) * 7 * 0.6 - 3); g.lineWidth = 1.2; g.strokeStyle = '#6a4a2a'; g.stroke(); circulo(g, x - Math.cos(f.ang) * 7, y - Math.sin(f.ang) * 4.2 - 3, 1); g.fillStyle = '#e8e2d0'; g.fill(); }
+  g.globalAlpha = 1;
+  for (const p of projeteis) {
+    const k = clamp((p.t + alphaSim / CONFIG.SIM_HZ * vel) / p.dur, 0, 1), d = Math.hypot(p.x1 - p.x0, p.y1 - p.y0);
+    const x = (lerp(p.x0, p.x1, k) + 0.5) * T, y = (lerp(p.y0, p.y1, k) + 0.5) * T - Math.sin(k * Math.PI) * d * 3.2;
+    const dx = (p.x1 - p.x0) * T, dy = (p.y1 - p.y0) * T - Math.cos(k * Math.PI) * d * 3.2 * Math.PI, L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L;
+    g.beginPath(); g.moveTo(x - ux * 8, y - uy * 8); g.lineTo(x + ux * 2, y + uy * 2); g.lineWidth = 2; g.strokeStyle = CONTORNO; g.stroke(); g.lineWidth = 1.1; g.strokeStyle = '#a8763f'; g.stroke();
+    circulo(g, x + ux * 2.5, y + uy * 2.5, 1.2); g.fillStyle = '#d0d4d8'; g.fill();
+    g.beginPath(); g.moveTo(x - ux * 8, y - uy * 8); g.lineTo(x - ux * 10 - uy * 2, y - uy * 10 + ux * 2); g.moveTo(x - ux * 8, y - uy * 8); g.lineTo(x - ux * 10 + uy * 2, y - uy * 10 - ux * 2); g.lineWidth = 1; g.strokeStyle = '#efe6cc'; g.stroke();
+    if (Q.nivel > 0) { g.beginPath(); g.moveTo(x - ux * 8, y - uy * 8); g.lineTo(x - ux * 20, y - uy * 20); g.lineWidth = 1; g.strokeStyle = 'rgba(255,255,255,.25)'; g.stroke(); }
+  }
+  // plano da caçada: marcadores das posições + rótulo da estratégia
+  for (const h of cacadas) {
+    const a = h.alvo, ax = a.rx * T + T / 2, ay = a.ry * T + T / 2;
+    if (h.fase === 'posicionando') for (const c of h.cacadores) {
+      const p = h.pos.get(c); if (!p) continue;
+      const px = (p.x + 0.5) * T, py = (p.y + 0.5) * T;
+      g.setLineDash([3, 3]); g.beginPath(); g.moveTo(c.rx * T + T / 2, c.ry * T + T / 2); g.lineTo(px, py); g.lineWidth = 1; g.strokeStyle = 'rgba(255,215,112,.55)'; g.stroke(); g.setLineDash([]);
+      circulo(g, px, py, 7 + Math.sin(tempoReal * 4) * 0.8); g.fillStyle = 'rgba(30,25,10,.45)'; g.fill(); g.lineWidth = 1.5; g.strokeStyle = '#ffd770'; g.stroke();
+      g.font = 'bold 8px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#ffd770'; g.fillText(c.nome[0], px, py + 0.5);
+      const pap = h.papel.get(c); g.font = '6px sans-serif'; g.fillStyle = '#fff3c4'; g.fillText(pap + (p.cob ? ' · coberto' : ''), px, py + 12);
+    }
+    const lab = `${h.estrategia}${h.fase === 'ataque' ? ' — ataque!' : ''}`, w = vento(), wx = ax + 30, wy = ay - 34;
+    g.font = 'bold 10px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    const tw = g.measureText(lab).width + 12; g.fillStyle = 'rgba(20,18,12,.78)'; g.beginPath(); g.roundRect(ax - tw / 2, ay - 40, tw, 14, 4); g.fill(); g.lineWidth = 1; g.strokeStyle = '#ffd770'; g.stroke();
+    g.fillStyle = h.fase === 'ataque' ? '#ff9a7a' : '#ffd770'; g.fillText(lab, ax, ay - 33);
+    g.beginPath(); g.moveTo(wx - w.x * 6, wy - w.y * 6); g.lineTo(wx + w.x * 6, wy + w.y * 6); g.lineTo(wx + w.x * 3 - w.y * 3, wy + w.y * 3 + w.x * 3); g.moveTo(wx + w.x * 6, wy + w.y * 6); g.lineTo(wx + w.x * 3 + w.y * 3, wy + w.y * 3 - w.x * 3);
+    g.lineWidth = 1.5; g.strokeStyle = '#cfe8ff'; g.stroke(); g.font = '6px sans-serif'; g.fillStyle = '#cfe8ff'; g.fillText('vento', wx, wy + 9);
+  }
+}
+function faiscasEscudo(c, a) { const x = (c.x + 0.5) * T + (a.x - c.x) * 6, y = (c.y + 0.5) * T + (a.y - c.y) * 4; for (let k = 0; k < (Q.nivel ? 5 : 2); k++) particula('lasca', x, y, 10, rv(-40, 40), rv(-30, 30), rv(30, 70), 0.6, { cor: '#c99a5b' }); }
+/* ------------------------------ UI v8 ------------------------------ */
+let abaInspecao = 'geral', camadaSaude = 'pele', parteSel = null;
+const CAMADAS = [['esqueleto', 'Esqueleto'], ['musculos', 'Músculos'], ['pele', 'Pele'], ['roupa', 'Roupa']];
+const FORMA_PARTE = {
+  cabeca: 'M50 6 C62 6 64 16 64 21 C64 30 58 36 50 36 C42 36 36 30 36 21 C36 16 38 6 50 6Z', pescoco: 'M44 35 H56 V43 H44Z',
+  torso: 'M33 43 H67 Q71 45 70 52 L68 96 Q50 101 32 96 L30 52 Q29 45 33 43Z',
+  bracoD: 'M30 46 Q22 46 20 54 L16 88 Q17 92 22 92 L27 89 L30 58Z', bracoE: 'M70 46 Q78 46 80 54 L84 88 Q83 92 78 92 L73 89 L70 58Z',
+  maoD: 'M13 93 Q13 88 19 89 Q26 90 25 96 Q24 104 18 103 Q12 101 13 93Z', maoE: 'M87 93 Q87 88 81 89 Q74 90 75 96 Q76 104 82 103 Q88 101 87 93Z',
+  pernaD: 'M33 96 Q41 100 49 98 L47 164 Q41 167 36 164Z', pernaE: 'M67 96 Q59 100 51 98 L53 164 Q59 167 64 164Z',
+  peD: 'M35 164 H48 Q49 172 44 175 Q33 177 30 172 Q31 166 35 164Z', peE: 'M65 164 H52 Q51 172 56 175 Q67 177 70 172 Q69 166 65 164Z',
+};
+const OSSOS = { // desenho do esqueleto por parte (só decoração)
+  cabeca: '<ellipse cx="50" cy="19" rx="10" ry="11"/><path d="M43 29 Q50 35 57 29"/><circle cx="46" cy="19" r="2.4" fill="#1d2024"/><circle cx="54" cy="19" r="2.4" fill="#1d2024"/>',
+  pescoco: '<path d="M50 35 V44"/>', torso: '<path d="M50 44 V92"/><path d="M50 50 Q38 50 37 56 M50 50 Q62 50 63 56 M50 57 Q38 57 37 63 M50 57 Q62 57 63 63 M50 64 Q39 64 38 70 M50 64 Q61 64 62 70"/><path d="M38 88 Q50 98 62 88 Q58 84 50 86 Q42 84 38 88Z"/>',
+  bracoD: '<path d="M27 50 L23 70 L20 88"/>', bracoE: '<path d="M73 50 L77 70 L80 88"/>', maoD: '<path d="M18 92 L16 100 M20 92 L20 101 M22 92 L23 100"/>', maoE: '<path d="M82 92 L84 100 M80 92 L80 101 M78 92 L77 100"/>',
+  pernaD: '<path d="M43 98 L42 130 L41 162"/><circle cx="42" cy="130" r="2"/>', pernaE: '<path d="M57 98 L58 130 L59 162"/><circle cx="58" cy="130" r="2"/>',
+  peD: '<path d="M41 165 L35 172 M42 166 L40 174 M43 166 L45 173"/>', peE: '<path d="M59 165 L65 172 M58 166 L60 174 M57 166 L55 173"/>',
+};
+const CENTRO_PARTE = { cabeca: [50, 21], pescoco: [50, 39], torso: [50, 70], bracoD: [23, 70], bracoE: [77, 70], maoD: [19, 96], maoE: [81, 96], pernaD: [42, 130], pernaE: [58, 130], peD: [40, 170], peE: [60, 170] };
+function svgCorpo(c) {
+  const s = saude(c), L = camadaSaude, por = {};
+  for (const f of s.feridas) (por[f.parte] = por[f.parte] || []).push(f);
+  let h = `<svg viewBox="0 0 100 180" width="98" height="176" style="flex:none;background:${L === 'esqueleto' ? '#14171a' : 'rgba(0,0,0,.25)'};border-radius:6px;touch-action:none">`;
+  for (const p in FORMA_PARTE) {
+    const roupa = L === 'roupa', g = PARTES[p].g;
+    let fill = L === 'esqueleto' ? '#1d2024' : L === 'musculos' ? (g === 'cabeca' ? '#b85a50' : '#a8443c') : c.pele;
+    if (roupa) fill = (g === 'torso' || g === 'braco') ? c.roupa : g === 'perna' ? '#4a3d33' : g === 'pe' ? '#3b2d22' : c.pele;
+    const fs = por[p] || [], pior = fs.reduce((m, f) => Math.max(m, f.sev), 0);
+    const borda = p === parteSel ? '#ffffff' : pior ? (pior > 0.55 ? '#ff4a3a' : pior > 0.3 ? '#ff9a3a' : '#ffd23a') : (L === 'esqueleto' ? '#444' : '#17140f');
+    h += `<path d="${FORMA_PARTE[p]}" data-parte="${p}" fill="${fill}" stroke="${borda}" stroke-width="${pior || p === parteSel ? 2.2 : 1.2}"${p === parteSel ? ' stroke-dasharray="3 2"' : ''} style="cursor:pointer"/>`;
+  }
+  if (L === 'esqueleto') h += `<g fill="none" stroke="#e8e2d0" stroke-width="2" stroke-linecap="round" pointer-events="none">${Object.values(OSSOS).join('')}</g>`;
+  if (L === 'musculos') h += `<g pointer-events="none" stroke="rgba(255,205,190,.35)" stroke-width="0.8" fill="none"><path d="M36 52 Q50 60 64 52 M36 62 Q50 68 64 62 M40 74 H60 M40 82 H60 M50 44 V96 M22 56 L20 84 M78 56 L80 84 M41 104 L42 158 M59 104 L58 158"/></g>
+    <g pointer-events="none"><ellipse cx="42" cy="58" rx="6" ry="9" fill="#d98a8a" opacity=".8"/><ellipse cx="58" cy="58" rx="6" ry="9" fill="#d98a8a" opacity=".8"/><path d="M50 61 C46 56 41 61 50 68 C59 61 54 56 50 61Z" fill="#7a1010"/><text x="50" y="92" font-size="5" text-anchor="middle" fill="#fbe">órgãos</text></g>`;
+  if (L === 'roupa') h += `<path d="M37 9 Q50 0 63 9 Q60 13 50 12 Q40 13 37 9Z" fill="${c.cabelo}" pointer-events="none"/>`;
+  // marcas de ferimento
+  for (const p in por) {
+    const [cx, cy] = CENTRO_PARTE[p];
+    for (const [k, f] of por[p].entries()) {
+      const ox = cx + (k - (por[p].length - 1) / 2) * 7;
+      if (f.tipo === 'fratura' && (L === 'esqueleto' || !f.tala)) h += `<path d="M${ox - 4} ${cy - 3} L${ox - 1} ${cy + 1} L${ox + 1} ${cy - 2} L${ox + 4} ${cy + 3}" stroke="#ff4a3a" stroke-width="1.8" fill="none" pointer-events="none"/>`;
+      else if (f.sangra > 0) h += `<path d="M${ox} ${cy - 5} Q${ox + 3.5} ${cy} ${ox} ${cy + 2.5} Q${ox - 3.5} ${cy} ${ox} ${cy - 5}Z" fill="#c01818" stroke="#300" stroke-width=".6" pointer-events="none"/>`;
+      else if (corta(f.tipo)) h += `<path d="M${ox - 4} ${cy - 2} L${ox + 4} ${cy + 2}" stroke="#a01818" stroke-width="1.6" pointer-events="none"/>`;
+      else h += `<circle cx="${ox}" cy="${cy}" r="${2 + f.sev * 3}" fill="rgba(110,60,150,.55)" pointer-events="none"/>`;
+      if (f.band || f.tala) h += `<rect x="${ox - 5}" y="${cy + 3}" width="10" height="2.6" rx="1" fill="${f.tala ? '#b07d4b' : '#f4f1e8'}" stroke="#222" stroke-width=".5" pointer-events="none"/>`;
+      if (f.infec > 0) h += `<circle cx="${ox}" cy="${cy}" r="6" fill="rgba(120,180,40,${(0.2 + f.infec * 0.5).toFixed(2)})" pointer-events="none"/>`;
+    }
+  }
+  return h + '</svg>';
+}
+const tabsInspecao = () => `<div style="display:flex;gap:4px;margin:-2px 0 4px">${[['geral', 'Geral'], ['saude', 'Saúde']].map(([k, n]) => `<span class="ordem${abaInspecao === k ? ' sel' : ''}" data-insp="${k}" style="padding:2px 9px;margin:0">${n}</span>`).join('')}</div>`;
+function textoFerida(f) {
+  const tr = f.tala ? 'tala' + (f.band ? ' + bandagem' : '') : f.band ? 'bandagem' : f.trat ? 'tratada sem bandagem' : '';
+  return `<b>${FERIDA[f.tipo].nome}</b> ${Math.round(f.sev * 100)}%` + (f.sangra > 0 ? ` · <span class="neg">sangramento ${nivelSangra(f)}</span>` : '') +
+    (f.infec > 0 ? ` · <span style="color:#a8d060">infecção ${Math.round(f.infec * 100)}%${f.infTrat ? ' (tratada)' : ''}</span>` : '') +
+    ` · ${tr ? `<span class="pos">${tr}</span>` : '<span class="neg">não tratada</span>'}`;
+}
+function htmlSaude(c) {
+  const s = saude(c), est = s.caido ? (s.inconsciente ? 'Inconsciente' : 'Caído(a)') : c.tarefa && c.tarefa.tipo === 'repousar' ? (c.tarefa.camaReal ? 'Repousando na cama médica' : 'Repousando') : s.feridas.length ? 'Ferido(a), de pé' : 'Saudável';
+  const lista = s.feridas.filter(f => !parteSel || f.parte === parteSel);
+  const bar = (rot, v, inv) => barraNec(rot, inv ? 100 - v : v).replace(/<i>\d+%<\/i>/, `<i>${Math.round(v)}%</i>`);
+  return tabsInspecao() + `<h3>${c.nome} <span style="font-size:12px;color:${s.caido ? '#ff8a7a' : '#bbb'}">— ${est}</span></h3>` +
+    bar('Sangue', s.sangue) + bar('Dor', s.dor * 100, true) + bar('Movimento', fatorMov(c) * 100) + bar('Trabalho', fatorTrab(c) * 100) +
+    `<div style="margin:5px 0 4px">${CAMADAS.map(([k, n]) => `<span class="ordem${camadaSaude === k ? ' sel' : ''}" data-camada="${k}" style="padding:2px 6px;margin:1px">${n}</span>`).join('')}</div>` +
+    `<div style="display:flex;gap:8px;align-items:flex-start">${svgCorpo(c)}<div style="flex:1;min-width:0;font-size:12px">` +
+    `<div class="sub" style="margin:0 0 3px">${parteSel ? PARTES[parteSel].nome + ' <span data-parte="" style="cursor:pointer;color:#9cf">(todas)</span>' : 'Toque numa parte do corpo'}</div>` +
+    (lista.length ? lista.map(f => `<div style="margin:2px 0">${parteSel ? '' : PARTES[f.parte].nome + ': '}${textoFerida(f)}</div>`).join('') : `<div style="color:#888">${parteSel ? 'Nada nesta parte.' : 'Nenhum ferimento.'}</div>`) +
+    `<div class="sub" style="margin-top:6px">Bandagens com ${c.nome}: ${c.bandagens || 0}${s.examinado ? ' · examinado(a)' : ''}</div></div></div>`;
+}
+function textoEquip(c) {
+  const l = []; if (c.arma) l.push(ARMAS[c.arma].nome); if (c.escudo) l.push('Escudo'); if (c.arma === 'arco') l.push(`${c.flechas || 0} flechas`); if (c.bandagens) l.push(`${c.bandagens} bandagem(ns)`);
+  return l.join(', ') || 'nenhum';
+}
+function animalEmTela(cx, cy) { const m = telaParaMundo(cx, cy); let mel = null, md = EH_TOQUE ? 30 : 20; for (const a of animais) { const d = Math.hypot(m.x - (a.rx * T + T / 2), m.y - (a.ry * T + T / 2 + 2)); if (d < md) { md = d; mel = a; } } return mel; }
+function htmlAnimal(a) {
+  const E = ESP_ANIMAL[a.esp], est = { pastar: 'pastando', vagar: 'andando', fugir: 'fugindo', atacar: 'atacando ' + (a.alvo ? a.alvo.nome : ''), partir: 'indo embora', morto: 'morto' }[a.estado] || a.estado;
+  const bando = a.bando ? animais.filter(o => o.bando === a.bando && !o.morto).length : 1;
+  return `<h3>${E.nome}${a.chifre ? ' (macho)' : ''}</h3><div class="sub">${est}${bando > 1 ? ` · bando de ${bando}` : ''} · vida ${Math.max(0, Math.round(a.hp))}/${E.hp} · alerta ${Math.round(Math.min(1, a.alerta) * 100)}%</div>` +
+    `<div class="sub">${a.esp === 'veado' ? 'Foge quando percebe alguém. Cansa depois de algumas fugas.' : a.esp === 'lobo' ? 'Caça em matilha, principalmente à noite.' : 'Territorial: ataca quem chega perto.'} Vento: ${SETA_VENTO(estado.vento || 0)} (aproxime-se a favor do vento e agachado).</div>` +
+    (a.morto ? '' : `<span class="ordem${a.cacar ? ' sel' : ''}" data-ani="cacar">🎯 ${a.cacar ? 'Cancelar caça' : 'Caçar'} (J)</span><span class="ordem" data-ani="grupo">👥 Caçada em grupo…</span>`);
+}
+// painel da caçada em grupo: escolher 2–4 caçadores; a estratégia aparece antes de começar
+let cacadaPainel = null;
+function abrirPainelCacada(a) {
+  if (!a || a.morto) return;
+  const sel = colonos.filter(c => !saude(c).caido).sort((p, q) => (p.prioridades.caca || 9) - (q.prioridades.caca || 9) || (q.arma ? 1 : 0) - (p.arma ? 1 : 0)).slice(0, Math.min(4, Math.max(2, colonos.length)));
+  cacadaPainel = { alvo: a, sel: new Set(sel) }; desenharPainelCacada();
+}
+function estrategiaPrevista(hs) { return hs.some(c => c.arma === 'arco' && c.flechas > 0) ? 'Emboscada' : hs.length >= 3 ? 'Cerco' : 'Flanco'; }
+const DESC_ESTR = { Emboscada: 'Arqueiros se escondem a favor do vento e atiram primeiro; quem luta corpo a corpo espera a primeira flechada e investe.',
+  Cerco: 'Os caçadores se espalham em arco em volta da presa (a favor do vento) e fecham o cerco juntos.', Flanco: 'Um batedor se aproxima a favor do vento; o outro dá a volta pelo lado e corta a fuga.' };
+function desenharPainelCacada() {
+  const el = $('cacadaPainel'); if (!cacadaPainel) { el.style.display = 'none'; return; }
+  const { alvo, sel } = cacadaPainel, hs = [...sel], est = estrategiaPrevista(hs);
+  el.style.display = 'block';
+  el.innerHTML = `<h4>Caçada em grupo — ${alvo.nome}${alvo.bando ? ` (bando de ${animais.filter(o => o.bando === alvo.bando && !o.morto).length})` : ''}</h4>` +
+    colonos.map(c => `<span class="ordem${sel.has(c) ? ' sel' : ''}" data-cac="${c.nome}">${c.nome}<br><small style="color:#aaa">${saude(c).caido ? 'caído' : textoEquip(c)}</small></span>`).join('') +
+    `<div class="breve" style="font-style:normal;color:#eee"><b style="color:#ffd770">${hs.length >= 2 && hs.length <= 4 ? est : '—'}</b> ${hs.length >= 2 && hs.length <= 4 ? DESC_ESTR[est] : 'Escolha de 2 a 4 caçadores.'}</div>` +
+    `<span class="ordem" data-cac="!ir">▶ Iniciar caçada</span><span class="ordem" data-cac="!x">✖ Cancelar</span>`;
+}
+document.addEventListener('DOMContentLoaded', () => {});
+function instalarUIv8() {
+  if (!$('cacadaPainel')) { const d = document.createElement('div'); d.id = 'cacadaPainel'; d.className = 'painel'; d.style.cssText = 'display:none;position:fixed;left:50%;top:70px;transform:translateX(-50%);width:min(420px,94vw);z-index:9;padding:8px 10px'; document.body.appendChild(d);
+    d.addEventListener('click', e => { const b = e.target.closest('[data-cac]'); if (!b || !cacadaPainel) return; const k = b.dataset.cac;
+      if (k === '!x') { cacadaPainel = null; }
+      else if (k === '!ir') { const h = iniciarCacada(cacadaPainel.alvo, [...cacadaPainel.sel]); if (h) { cacadaPainel = null; mostrarToast(`Caçada: ${h.estrategia}`); } }
+      else { const c = colonos.find(o => o.nome === k); if (c && !saude(c).caido) { if (cacadaPainel.sel.has(c)) cacadaPainel.sel.delete(c); else if (cacadaPainel.sel.size < 4) cacadaPainel.sel.add(c); } }
+      desenharPainelCacada(); }); }
+  $('inspecionar').addEventListener('pointerdown', e => {
+    const t = e.target.closest('[data-insp],[data-camada],[data-parte],[data-ani]'); if (!t) return; e.preventDefault();
+    if (t.dataset.insp) abaInspecao = t.dataset.insp;
+    else if (t.dataset.camada) camadaSaude = t.dataset.camada;
+    else if (t.dataset.parte !== undefined) parteSel = t.dataset.parte && t.dataset.parte !== parteSel ? t.dataset.parte : null;
+    else if (t.dataset.ani && inspecao && inspecao.animal) { const a = inspecao.animal; if (t.dataset.ani === 'cacar') { a.cacar = !a.cacar; log(a.cacar ? `${a.nome} marcado(a) para caça.` : 'Caça cancelada.'); } else abrirPainelCacada(a); }
+    atualizarUI();
+  });
+  const bar = $('toque'); if (bar && !bar.querySelector('[data-t="cacar"]')) { const b = document.createElement('button'); b.dataset.t = 'cacar'; b.innerHTML = '<b>🎯</b>Caçar'; bar.insertBefore(b, bar.querySelector('[data-t="cancelar"]'));
+    b.addEventListener('click', () => { document.body.classList.remove('gaveta'); definirModo(modo === 'cacar' ? null : 'cacar'); }); }
+}
+/* ------------------------------ SAVE v8 ------------------------------ */
+function serializarV8() {
+  return animais.filter(a => !a.morto).map(a => ({ esp: a.esp, x: Math.round(a.x), y: Math.round(a.y), hp: a.hp, bando: a.bando, casa: a.casa, cacar: !!a.cacar, caca: !!a.caca, ate: a.ate || 0, chifre: !!a.chifre, stamina: a.stamina }));
+}
+function aplicarSaveV8(d) {
+  const rs = rndSim.s;
+  animais.length = projeteis.length = cacadas.length = flechasChao.length = manchas.length = 0;
+  if (Array.isArray(d.animais)) { for (const s of d.animais) if (ESP_ANIMAL[s.esp]) { const a = criarAnimal(s.esp, s.x, s.y, { hp: s.hp, bando: s.bando, casa: s.casa || { x: s.x, y: s.y }, cacar: s.cacar, caca: s.caca, ate: s.ate || 0, chifre: s.chifre, stamina: s.stamina ?? 1 }); idBando = Math.max(idBando, s.bando || 0); } }
+  else povoarAnimais(); // save antigo (v6/v7): coloca a fauna inicial
+  for (const c of colonos) { saude(c); c.arma = c.arma || null; c.escudo = !!c.escudo; c.flechas = c.flechas || 0; c.bandagens = c.bandagens || 0; c.carregadoPor = c.resgatador = c.medico = null; c.anim = null; c.pedeAjuda = false; c.agachado = false; c.sentado = false;
+    if (c.saude.caido) c.anim = null; }
+  if (estado.vento === undefined) estado.vento = 0.8;
+  rndSim.s = rs;
+}
+function fatorMovTotal(c) {
+  const t = c.tarefa; let k = fatorMov(c) * (c.agachado ? 0.45 : 1);
+  if (t && t.tipo === 'resgatar' && t.fase === 'levando') k *= ESTILO_CARGA[t.estilo].vel;
+  if (t && t.tipo === 'fugir') k *= 1.12;
+  return k;
+}
+function ordemCaca(a, b) {
+  const x0 = Math.min(a.x, b.x) - 1, x1 = Math.max(a.x, b.x) + 1, y0 = Math.min(a.y, b.y) - 1, y1 = Math.max(a.y, b.y) + 1;
+  if (modo === 'cacada') {
+    const cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2; let m = null, md = 3;
+    for (const an of animais) if (!an.morto) { const d = Math.hypot(an.x - cx, an.y - cy); if (d < md) { md = d; m = an; } }
+    if (m) { definirModo(null); abrirPainelCacada(m); } else mostrarToast('Toque num animal');
+    return;
+  }
+  let n = 0;
+  for (const an of animais) if (!an.morto && !an.cacar && an.x >= x0 - 0.5 && an.x <= x1 + 0.5 && an.y >= y0 - 0.5 && an.y <= y1 + 0.5) { an.cacar = true; n++; }
+  if (n) log(`${n} animal(is) marcado(s) para caça (colonos com Caça ligada vão atrás).`); else mostrarToast('Nenhum animal ali');
+}
+instalarUIv8();
+window.V8 = { ferir, criarAnimal, grupoAnimais, ataqueForcado, dispararEventoV8, iniciarCacada, encerrarCacada, animais, cacadas, projeteis, saude, seres, povoarAnimais, estiloResgate, POSES };
+
 /* =============================== LOOP =============================== */
 function redimensionar() { canvas.width = Math.floor(innerWidth * dpr()); canvas.height = Math.floor(innerHeight * dpr()); }
 window.addEventListener('resize', redimensionar);
@@ -3595,6 +5062,7 @@ function novoJogo(seed) {
   rndSim.s = (seed ^ 0x5bd1e995) | 0;
   gerarMapa(seed);
   criarColonos();
+  povoarAnimais(); estado.vento = rnd() * Math.PI * 2; cacadaPainel = null; if ($('cacadaPainel')) $('cacadaPainel').style.display = 'none';
   camera.x = mapa.L * T / 2 + T / 2; camera.y = mapa.A * T / 2 + T / 2;
   estado.minutos = CONFIG.HORA_INICIAL * 60;
   inspecao = null; definirModo(null);
@@ -3619,6 +5087,7 @@ function passoSimulacao(dtReal) {
   estado.minutos += minutos;
   for (const c of colonos) atualizarColono(c, dt, minutos / 60);
   for (const v of visitantes.slice()) atualizarVisitante(v, dt);
+  atualizarV8(dt, minutos);
   atualizarConversas(dt);
   atualizarQuedas(dt);
   atualizarChuva(minutos / 60);
@@ -3642,6 +5111,7 @@ function quadro(t) {
   let n = 0;
   while (acumSim >= passoFixo && n < 8) {
     for (const c of personagens()) guardarAnterior(c);
+    for (const a of animais) guardarAnterior(a);
     try { passoSimulacao(passoFixo); } catch (err) { console.error(err); }
     acumSim -= passoFixo; n++;
   }

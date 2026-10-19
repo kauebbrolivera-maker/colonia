@@ -58,6 +58,7 @@ As frutas dos arbustos voltam a crescer em 3 dias.
 | Sair do modo de ordens / desmarcar / fechar aba | Esc |
 | Mandar andar | Clique direito num tile (com um colono selecionado) |
 | Ordens: cortar / minerar / cancelar | C / M / X, depois clicar ou arrastar no mapa |
+| Caçar animais / Caçada em grupo (v8) | J / U, depois clicar no animal |
 | Pausar / continuar | Espaço |
 | Velocidade | 1, 2, 3 |
 | Qualidade gráfica (Baixo → Médio → Alto) | G, ou botão **⚙ Opções** na barra de baixo |
@@ -254,3 +255,53 @@ O iOS não abre arquivos HTML locais: publique a pasta no **GitHub Pages** (ou o
 - O zoom da página por pinça/toque duplo e o "elástico" da rolagem ficam bloqueados; o zoom de pinça é só o do jogo. A barra de baixo e os painéis respeitam o notch e a barra de início (safe-area).
 - **Exportar** no iPhone abre o menu Compartilhar (Salvar em Arquivos, AirDrop…). **Importar** usa o seletor de arquivos ou o código colado.
 - No celular o cache do chão fica limitado a 3200×3200 px, abaixo do limite de memória de canvas do iOS.
+
+## v8 — saúde, medicina, animais selvagens, armas e caçada em grupo
+
+### Saúde (aba **Saúde** no painel do colono)
+- Painel com abas **Geral / Saúde**. A aba Saúde mostra Sangue, Dor, Movimento e Trabalho e um **diagrama do corpo** com 4 camadas: **Esqueleto, Músculos, Pele, Roupa**.
+- Toque/clique numa parte (cabeça, pescoço, tronco, braços, mãos, pernas, pés) para ver só os ferimentos dela; "(todas)" volta à lista completa.
+- Ferimentos: **contusão, corte, mordida, fratura**; sangramento **leve / médio / forte** (perda de sangue, pingos e manchas no chão que somem aos poucos); **infecção** (surge em feridas abertas mal tratadas, piora com o tempo, o corpo reage devagar e o tratamento cura mais rápido); **desmaio**.
+- Efeitos: dor, mancar (perna/pé), braço pendurado, trabalho mais lento, caretas de dor, e o colono **cai** quando perde muito sangue ou a dor fica alta demais. Caído, fica deitado até ser resgatado ou melhorar.
+
+### Medicina
+- Prioridade **Médico** na aba Trabalho (Iara começa com 1). Médicos tratam automaticamente e tratar vem **antes** do trabalho comum; médicos acordam/levantam para socorrer quem caiu.
+- **Bandagens** na bancada: de pele (1 pele → 3) ou de fibra (4 frutas → 1). Com bandagem o tratamento é bem melhor. A colônia pede bandagens sozinha quando há menos de 4.
+- Cama ocupada por paciente vira **cama médica** (cobertor azul com cruz); repousar na cama cura mais rápido (×1,7; no chão ×1,3).
+- 20 animações de tratamento, escolhidas pelo tipo de ferida e parte do corpo: tratar perna / pé / braço / mão / cabeça / tronco, bandagem na perna / braço / cabeça / tronco, tala na perna / braço, pressionar sangramento, limpar ferida, tratar infecção, examinar (pulso), ajudar a sentar, tratar na cama, e as do paciente: desmaiar e levantar.
+
+### Resgate — 5 jeitos de carregar
+Escolhido automaticamente: **no ombro (bombeiro)** para desacordados, **no colo** para paciente leve ou ferido no tronco, **arrastando** se a perna está quebrada ou quem carrega está ferido, **apoio no ombro** para quem manca, **de cavalinho** para pé machucado. Todos com transição suave de pegar e de pôr na cama.
+
+### Animais selvagens
+- **Veado**: pasta em manada, foge quando percebe alguém e cansa depois de algumas fugas.
+- **Lobo**: matilha de 2–3, caça à noite e vai embora depois de derrubar alguém.
+- **Urso**: raro e territorial, ataca quem chega perto da toca.
+- Andar, correr, atacar e morrer têm animação. Os ataques ferem partes específicas do corpo.
+- Colonos atacados lutam (punhos, ferramenta ou arma) ou fogem, e quem está perto ajuda.
+- Animal abatido vira **carcaça**, carneada automaticamente na bancada em **carne** (comida) e **pele**.
+
+### Armas (bancada)
+- **Espada**: corpo a corpo, mais dano que o machado.
+- **Arco**: à distância. Precisa de **flechas** (madeira → 12). Tem animação de puxar, mirar e soltar, e a flecha voa em arco.
+- **Escudo**: bloqueia parte dos golpes, com animação e faíscas.
+- Encaixes: arma + escudo. O arco usa as duas mãos, então quem pega arco larga o escudo. Os colonos equipam sozinhos o que estiver no estoque.
+
+### Caçar
+- **Caçar (J)**, ou o botão 🎯 no celular: toque ou arraste sobre animais para marcá-los. Colonos com **Caça** ligada vão atrás.
+- **Caçada em grupo (U)**: toque num animal ou bando e escolha de 2 a 4 caçadores. O painel já mostra a estratégia:
+  - **Emboscada** (se houver arqueiro): arqueiros escondidos atiram primeiro, e o corpo a corpo espera a primeira flechada para investir.
+  - **Cerco** (3 ou mais): os caçadores se espalham em arco e fecham juntos.
+  - **Flanco**: um batedor se aproxima enquanto o outro dá a volta e corta a fuga.
+- A IA planeja as posições **a favor do vento** e atrás de árvores, rochas e arbustos (cobertura). Os caçadores andam **agachados** perto da presa. O animal percebe por visão (menos de noite, com cobertura ou com o caçador agachado), por cheiro (vento contra) e por barulho.
+- Todos esperam em posição antes do ataque. Se a presa percebe antes, ela foge (veado) ou investe (lobo/urso).
+- No mapa aparecem marcadores das posições planejadas, linhas, papéis ("arqueiro · coberto"), o nome da estratégia e a seta do vento. Tudo vai para o registro.
+
+### Salvar
+Save versão **8** (códigos `C8:`/`J8:`). Lê saves e códigos das versões 6 e 7. Saves antigos ganham a fauna inicial e saúde zerada.
+
+### Limites conhecidos (v8)
+- **Ninguém morre**: sangue tem piso e infecção sem tratamento acaba sarando devagar. Um colono pode ficar muito tempo caído se não houver médico.
+- Algumas animações compartilham código: as 4 bandagens usam a mesma rotina de "voltas" (`orbitaBandagem`) com alvo/raio diferentes, as 2 talas usam `talas`, e desmaiar/levantar/deitado são poses do paciente (`poseDeitada`), não do médico.
+- Cozinhar carne não existe (é comida crua como as frutas). Não há armadura nem munição recuperável além das flechas que ficam no chão por um tempo.
+- O tempo de luta é em segundos de simulação, então nas velocidades 2×/3× um combate dura "horas" no relógio do jogo.
