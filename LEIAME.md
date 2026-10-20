@@ -324,3 +324,17 @@ Save versão **8** (códigos `C8:`/`J8:`). Lê saves e códigos das versões 6 e
   - Modo deus (liga/desliga): construção instantânea, fabricação instantânea, sem fome, sem sono, revelar (rótulos de todos os animais do mapa; o jogo não tem névoa de guerra).
 - Toda ação dev aparece no registro como "🛠 DEV: …".
 - Saves: a versão continua C8 e saves da v8 carregam normalmente.
+
+## v10 — Saúde completa (anatomia)
+- Anatomia hierárquica (54 partes no humano; veado/lobo/urso com 23): HP, cobertura, interna/externa, vital. Destruir uma parte remove as filhas (dedo → mão → braço). Ossos não somem: trincam ou fraturam, e fratura só cura com tala.
+- Tipos de dano: corte, contundente, queimadura, mordida/arranhão, perfuração. O golpe escolhe a parte pela cobertura e pode atingir os órgãos internos.
+- Capacidades: Consciência, Movimento, Manipulação, Visão, Audição, Respiração, Circulação, Bombeamento e Filtragem. Elas afetam a velocidade, o trabalho e a mira.
+- Dor (com choque de dor a 80%) e consciência baixa derrubam o colono. A perda de sangue tem estágios até a morte. Também se morre por parte vital destruída ou consciência zerada.
+- Quem morre vira cadáver, e os outros colonos recebem um pensamento ruim. O modo dev pode ressuscitar.
+- Infecção × imunidade, cicatrizes, cura mais rápida quando a ferida é tratada. Sem médico livre, o colono trata a si mesmo.
+- Aba Saúde: resumo das capacidades, dor, sangramento e corrida contra a infecção. A lista mostra só as partes feridas.
+- Diagrama em camadas (Esqueleto, Músculos, Órgãos, Pele/Corpo) com partes clicáveis. O botão 🔍 mostra as 4 camadas lado a lado.
+- Bandagem simples (pele ou fibra) e bandagem boa (pele + frutas; não há ervas no jogo). A qualidade da bandagem muda a qualidade do tratamento, e a habilidade do médico sobe com o uso.
+- Resgate fluido (ajoelhar → braços por baixo → erguer → levar → deitar), estilos de carregar melhorados e balão de tratamento sobre a parte ferida.
+- Animais em vista lateral, com passo/trote/galope, pastar, mancar, caído e morte.
+- Save v10 (código C10/J10). Lê os saves das versões 6 a 9.

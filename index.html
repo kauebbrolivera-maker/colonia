@@ -550,7 +550,7 @@ const ITEM = {
   MACHADO: { nome: 'Machado', max: 1, ferramenta: 'machado' },
   PICARETA: { nome: 'Picareta', max: 1, ferramenta: 'picareta' },
   ESPADA: { nome: 'Espada', max: 1, equip: 'arma' }, ARCO: { nome: 'Arco', max: 1, equip: 'arma' }, ESCUDO: { nome: 'Escudo', max: 1, equip: 'escudo' },
-  FLECHAS: { nome: 'Flechas', max: 40, equip: 'municao' }, BANDAGEM: { nome: 'Bandagem', max: 20, equip: 'medico' },
+  FLECHAS: { nome: 'Flechas', max: 40, equip: 'municao' }, BANDAGEM: { nome: 'Bandagem simples', max: 20, equip: 'medico' }, BANDAGEM_BOA: { nome: 'Bandagem boa', max: 20, equip: 'medico' },
   CARNE: { nome: 'Carne', max: 75 }, PELE: { nome: 'Pele', max: 30 },
   CARC_VEADO: { nome: 'Carcaça de veado', max: 1 }, CARC_LOBO: { nome: 'Carcaça de lobo', max: 1 }, CARC_URSO: { nome: 'Carcaça de urso', max: 1 },
 };
@@ -740,8 +740,9 @@ const RECEITAS = { // feitas na bancada (materiais saem do estoque quando começ
   ARCO:     { nome: 'Arco',     custo: { MADEIRA: 8 }, tempo: 120 },
   FLECHAS:  { nome: 'Flechas (x12)', custo: { MADEIRA: 4 }, tempo: 60, saida: { FLECHAS: 12 } },
   ESCUDO:   { nome: 'Escudo',   custo: { MADEIRA: 8, PEDRA: 2 }, tempo: 110 },
-  BANDAGEM: { nome: 'Bandagens de pele (x3)', custo: { PELE: 1 }, tempo: 40, saida: { BANDAGEM: 3 } },
-  BANDAGEM_FIBRA: { nome: 'Bandagem de fibra', custo: { FRUTAS: 4 }, tempo: 40, saida: { BANDAGEM: 1 } },
+  BANDAGEM: { nome: 'Bandagens simples de pele (x3)', custo: { PELE: 1 }, tempo: 40, saida: { BANDAGEM: 3 } },
+  BANDAGEM_BOA: { nome: 'Bandagens boas (pele + frutas, x2)', custo: { PELE: 1, FRUTAS: 6 }, tempo: 60, saida: { BANDAGEM_BOA: 2 } },
+  BANDAGEM_FIBRA: { nome: 'Bandagem simples de fibra', custo: { FRUTAS: 4 }, tempo: 40, saida: { BANDAGEM: 1 } },
   CARNEAR_VEADO: { nome: 'Carnear veado', custo: { CARC_VEADO: 1 }, tempo: 70, saida: { CARNE: 24, PELE: 2 }, auto: true },
   CARNEAR_LOBO:  { nome: 'Carnear lobo',  custo: { CARC_LOBO: 1 },  tempo: 60, saida: { CARNE: 12, PELE: 2 }, auto: true },
   CARNEAR_URSO:  { nome: 'Carnear urso',  custo: { CARC_URSO: 1 },  tempo: 110, saida: { CARNE: 45, PELE: 4 }, auto: true },
@@ -1323,7 +1324,7 @@ function atualizarColono(c, dt, horasJogo) {
   if (atualizarColonoV8(c, dt, horasJogo)) return;
   if (c.prioridades.medico && c.tarefa && ((c.tarefa.tipo === 'dormir' && c.sono > 20) || (c.tarefa.tipo === 'repousar' && c.tarefa.fase === 'deitado' && fatorMov(c) > 0.45 && !saude(c).caido)) && (c.chkResg = (c.chkResg || 0) - dt) <= 0) {
     c.chkResg = 2;
-    if (colonos.some(p => p !== c && saude(p).caido && !p.resgatador && !p.carregadoPor && !(p.tarefa && p.tarefa.tipo === 'repousar'))) { const tp = c.tarefa.tipo; cancelar(c); c.dormindo = false; c.naCama = false; c.saiuCama = agora(); log(`${c.nome} ${tp === 'dormir' ? 'acorda' : 'se levanta'} para socorrer quem caiu.`); }
+    if (colonos.some(p => p !== c && ((saude(p).caido && !p.resgatador && !p.carregadoPor && !(p.tarefa && p.tarefa.tipo === 'repousar')) || (!p.medico && saude(p).feridas.some(f => f.infec > 0.3 && infecPede(f)))))) { const tp = c.tarefa.tipo; cancelar(c); c.dormindo = false; c.naCama = false; c.saiuCama = agora(); log(`${c.nome} ${tp === 'dormir' ? 'acorda' : 'se levanta'} para socorrer quem caiu.`); }
   }
 
   // --- interrupções por necessidade urgente ---
@@ -1941,8 +1942,8 @@ function desenharColono(g, c, x, y, p = {}) {
   if (N > 0 && !p.semPes) {
     const pes = [-1, 1].map(sd => {
       const psi = F + (sd > 0 ? 0 : Math.PI), d = Math.sin(psi) * passoA, lift = Math.max(0, Math.cos(psi)) * 1.7 * w;
-      const kn = (p.ajoelha || 0) * (sd > 0 ? 4.5 : -0.5) + (p.sentado || 0) * 5;
-      return { x: lx * sd * 3 + fx * (d + kn) + quadril * lx, y: 12 + ly * sd * 3 + fy * (d + kn) - lift + (p.ajoelha || 0) * 1.2, lift, prof: ly * sd };
+      const kn = (p.ajoelha || 0) * (sd > 0 ? 4.5 : -0.5) + (p.sentado || 0) * 5, bal = (p.pesBalanco || 0) * (sd > 0 ? 1 : 0.7);
+      return { x: lx * sd * 3 + fx * (d + kn) + quadril * lx + bal, y: 12 + ly * sd * 3 + fy * (d + kn) - lift + (p.ajoelha || 0) * 1.2, lift, prof: ly * sd };
     }).sort((a, b) => a.prof - b.prof);
     for (const pe of pes) {
       elipse(g, pe.x, pe.y, 2.2 + Math.abs(s) * 0.9, 1.6 * (N === 2 ? 1 - pe.lift * 0.12 : 1), N === 2 ? -fx * pe.lift * 0.25 : 0);
@@ -1974,7 +1975,9 @@ function desenharColono(g, c, x, y, p = {}) {
   if (p.agacha && !p.acao && !carrega) maos = maos.map((m, k) => ({ x: lx * (k ? 1 : -1) * 4.5 + fx * 5, y: 8 + ly * (k ? 1 : -1) * 4.5 + fy * 5, atras: m.atras }));
   if (p.maosExtra) maos = p.maosExtra(maos, { lx, ly, fx, fy, bw, co, s });
   const mao = m => {
-    circulo(g, m.x, m.y, 2.3); g.fillStyle = c.pele; g.fill(); g.lineWidth = 1.2; g.strokeStyle = CONTORNO; g.stroke();
+    if (N > 0) { const ox = m.x < 0 ? 1 : -1; elipse(g, m.x + ox * 1.6, m.y - 1, 1.1, 0.8, ox * 0.6); g.fillStyle = c.pele; g.fill(); g.lineWidth = 0.8; g.strokeStyle = CONTORNO; g.stroke(); }
+    elipse(g, m.x, m.y, 2.3, 2.1); g.fillStyle = c.pele; g.fill(); g.lineWidth = 1.2; g.strokeStyle = CONTORNO; g.stroke();
+    if (N === 2) { g.beginPath(); g.arc(m.x, m.y + 0.3, 1.3, 0.3, 2.8); g.lineWidth = 0.5; g.strokeStyle = 'rgba(0,0,0,0.25)'; g.stroke(); }
     if (m.fruta) { circulo(g, m.x + 0.9, m.y - 1.3, 1.5); g.fillStyle = '#b8223a'; g.fill(); g.lineWidth = 0.6; g.stroke(); }
   };
   const itemCarregado = () => { g.save(); g.translate(fx * 5.5, 6.5 + fy * 5.5); g.scale(0.6, 0.6); desenharItem(g, { tipo: carrega.tipo, qtd: carrega.qtd, x: 0, y: 0 }, 0, 0); g.restore(); };
@@ -1982,20 +1985,23 @@ function desenharColono(g, c, x, y, p = {}) {
   if (ferr && ferr.atras) desenharFerramenta(g, ferr);
   for (const m of maos) if (m.atras && !m.sobre) mao(m);
   if ((p.escudo || p.bloqueio) && co < -0.25) desenharEscudoNoColono(g, p, maos, lx, ly, fx, fy);
-  elipse(g, 0, 5, bw, 7.3); g.fillStyle = c.roupa; g.fill();
+  tronco(g, bw, s, co); g.fillStyle = c.roupa; g.fill();
   g.save(); g.clip();
+  if (N > 0) { const gr = g.createLinearGradient(-bw, 0, bw, 0); gr.addColorStop(0, 'rgba(255,255,255,0.10)'); gr.addColorStop(0.55, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,0.22)'); g.fillStyle = gr; g.fillRect(-bw - 2, -4, bw * 2 + 4, 18);
+    g.lineWidth = 0.7; g.strokeStyle = 'rgba(0,0,0,0.18)'; for (const k of [-1, 1]) { g.beginPath(); g.moveTo(k * bw * 0.55 + s, 1.5); g.quadraticCurveTo(k * bw * 0.3 + s * 1.5, 5, k * bw * 0.5 + s, 8); g.stroke(); }
+    if (frente) { g.beginPath(); g.moveTo(-3.2 + s * 2.5, -1.6); g.quadraticCurveTo(s * 2.5, 1.6, 3.2 + s * 2.5, -1.6); g.lineWidth = 1.1; g.strokeStyle = 'rgba(0,0,0,0.32)'; g.stroke(); } }
   elipse(g, 2 + s, 10, bw + 1, 5); g.fillStyle = 'rgba(0,0,0,0.2)'; g.fill();
   if (N > 0) { elipse(g, -3 + s * 1.5, 1, 4, 3); g.fillStyle = 'rgba(255,255,255,0.12)'; g.fill(); }
   const barra = mola * 0.6; // cinto/barra da roupa balança junto (Alto)
   g.beginPath(); g.moveTo(-bw, 8.5 + barra); g.quadraticCurveTo(-s * 2, 10 + barra * 1.5, bw, 8.5 + barra); g.lineWidth = 1.2; g.strokeStyle = 'rgba(0,0,0,0.3)'; g.stroke();
   g.restore();
-  g.lineWidth = 1.6; g.strokeStyle = CONTORNO; elipse(g, 0, 5, bw, 7.3); g.stroke();
+  g.lineWidth = 1.6; g.strokeStyle = CONTORNO; tronco(g, bw, s, co); g.stroke();
   if (c.estilo === 'longo' && !frente) cabeloLongo();
   if (carrega && frente) itemCarregado();
   if (ferr && !ferr.atras) desenharFerramenta(g, ferr);
   for (const m of maos) if (!m.atras && !m.sobre) mao(m);
   // cabeça (um pouco à frente quando anda)
-  g.save(); g.translate((N === 0 ? 0 : fx * 0.9 * w) + (p.careta ? Math.sin(tempoReal * 46) * p.careta * 0.9 : 0), (N === 0 ? 0 : fy * 0.8 * w) + mola * 0.35);
+  g.save(); g.translate((p.cabecaOff ? p.cabecaOff.x : 0) + (N === 0 ? 0 : fx * 0.9 * w) + (p.careta ? Math.sin(tempoReal * 46) * p.careta * 0.9 : 0), (p.cabecaOff ? p.cabecaOff.y : 0) + (N === 0 ? 0 : fy * 0.8 * w) + mola * 0.35);
   desenharCabeca(g, c, s, co, p.fechados, mola);
   g.restore();
   for (const m of maos) if (m.sobre) mao(m); // mão na boca (comendo) fica na frente do rosto
@@ -2004,6 +2010,11 @@ function desenharColono(g, c, x, y, p = {}) {
   if ((p.escudo || p.bloqueio) && co >= -0.25) desenharEscudoNoColono(g, p, maos, lx, ly, fx, fy);
   g.restore();
   g.restore();
+}
+function tronco(g, bw, s, co) { // ombros mais largos, cintura, quadril
+  const ob = bw + 0.6, cin = bw - 1.4, qd = bw - 0.3;
+  g.beginPath(); g.moveTo(-ob + 1.5, -1.8); g.quadraticCurveTo(0, -3.4, ob - 1.5, -1.8); g.quadraticCurveTo(ob + 0.4, -1, ob, 2.2);
+  g.quadraticCurveTo(cin, 6, qd, 9.6); g.quadraticCurveTo(qd, 12.4, 0, 12.4); g.quadraticCurveTo(-qd, 12.4, -qd, 9.6); g.quadraticCurveTo(-cin, 6, -ob, 2.2); g.quadraticCurveTo(-ob - 0.4, -1, -ob + 1.5, -1.8); g.closePath();
 }
 // cabeça com rosto que gira continuamente (olhos e cabelo seguem o yaw)
 function desenharCabeca(g, c, s, co, fechados, mola) {
@@ -3369,7 +3380,7 @@ function montarRetratos() {
 const iconesRecurso = {};
 function montarRecursos() {
   const el = $('recursos'); el.innerHTML = '';
-  for (const tipo of ['MADEIRA', 'PEDRA', 'FRUTAS', 'MILHO', 'CARNE', 'BANDAGEM']) {
+  for (const tipo of ['MADEIRA', 'PEDRA', 'FRUTAS', 'MILHO', 'CARNE', 'BANDAGEM', 'BANDAGEM_BOA']) {
     const sp = document.createElement('span'); sp.title = ITEM[tipo].nome + ' no estoque';
     const cv = novoCanvas(40, 40), g = cv.getContext('2d'); g.scale(1.5, 1.5);
     desenharItem(g, { tipo, qtd: 50, x: 0, y: 0 }, 13.3, 11);
@@ -3532,7 +3543,8 @@ function definirQualidade(q, avisar = true) {
 /* =========================== SALVAR / CARREGAR ===========================
    Tudo em JSON. Mapas (typed arrays) em base64. Slots no localStorage: 'colonia.auto' (automático) e 'colonia.salvo' (manual).
    Exportar: arquivo .json (download) ou "código" (gzip + base64) para copiar/colar entre celular e PC. */
-const VERSAO_SAVE = 8; // v8: saúde, animais, armas (lê 6, 7 e 8); // v7 lê saves da v6 (mesmo formato; a v7 só acrescentou espécies de árvore)
+const VERSAO_SAVE = 10; // v10: anatomia completa, cadáveres, saúde dos animais (lê 6 a 10)
+const VERSAO_SAVE_V8 = 8; // v8: saúde, animais, armas (lê 6, 7 e 8); // v7 lê saves da v6 (mesmo formato; a v7 só acrescentou espécies de árvore)
 const CAMPOS_MAPA = ['terreno', 'arvore', 'variante', 'fase', 'toco', 'frutos', 'rebrota', 'estrutura'];
 function b64DeArray(a) { const u = new Uint8Array(a.buffer, a.byteOffset, a.byteLength); let r = ''; for (let i = 0; i < u.length; i += 0x8000) r += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(r); }
 function arrayDeB64(str, Tipo) { const bin = atob(str), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new Tipo(u.buffer); }
@@ -3550,11 +3562,11 @@ function serializar() {
   });
   const cols = colonos.map(c => { const o = {}; for (const k in c) if (!SEM_SALVAR.has(k)) o[k] = c[k]; o.camaPropria = c.camaPropria ? { x: c.camaPropria.x, y: c.camaPropria.y } : null; return o; });
   const e = { minutos: estado.minutos, pausado: estado.pausado, velocidade: estado.velocidade, indicadores: estado.indicadores, verTeto: estado.verTeto, chuva: estado.chuva, pedidos: estado.pedidos, stats: estado.stats, proximoEvento: estado.proximoEvento, vento: estado.vento };
-  return { jogo: 'colonia', versao: VERSAO_SAVE, quando: Date.now(), dia: Math.floor(estado.minutos / 1440) + 1, rnd: rndSim.s, camera: { x: camera.x, y: camera.y, zoom: camera.zoom }, mapa: m, itens: its, colonos: cols, estado: e, animais: serializarV8() };
+  return { jogo: 'colonia', versao: VERSAO_SAVE, quando: Date.now(), dia: Math.floor(estado.minutos / 1440) + 1, rnd: rndSim.s, camera: { x: camera.x, y: camera.y, zoom: camera.zoom }, mapa: m, itens: its, colonos: cols, estado: e, animais: serializarV8(), cadaveres: serializarCadaveres() };
 }
 function validarSave(d) {
   if (!d || d.jogo !== 'colonia') throw new Error('isto não é um save da Colônia');
-  if (![6, 7, VERSAO_SAVE].includes(d.versao)) throw new Error(`versão do save ${d.versao} (este jogo lê 6, 7 e ${VERSAO_SAVE})`);
+  if (![6, 7, 8, 9, VERSAO_SAVE].includes(d.versao)) throw new Error(`versão do save ${d.versao} (este jogo lê da 6 à ${VERSAO_SAVE})`);
   if (!d.mapa || !Array.isArray(d.colonos) || !Array.isArray(d.itens)) throw new Error('save incompleto');
 }
 function aplicarSave(d) {
@@ -3571,6 +3583,7 @@ function aplicarSave(d) {
   for (const it of itens.slice()) removerItem(it);
   itemEm.clear(); itens.length = 0;
   for (const it of d.itens) { if (it.solto) largarItem(it.x, it.y, it.tipo, it.qtd); else if (!itemEm.has(idx(it.x, it.y))) novoItem(it.x, it.y, it.tipo, it.qtd); else largarItem(it.x, it.y, it.tipo, it.qtd); }
+  for (const c of colonos.slice()) if (!d.colonos.some(sc => sc.nome === c.nome)) colonos.splice(colonos.indexOf(c), 1); // morto/removido no save
   for (const sc of d.colonos) {
     let c = colonos.find(o => o.nome === sc.nome); if (!c) c = criarColonoExtra({ nome: sc.nome }, sc.x, sc.y, true); // colono extra (modo dev)
     const { camaPropria, ...resto } = sc; Object.assign(c, resto);
@@ -3587,6 +3600,8 @@ function aplicarSave(d) {
   mapa.canvasChao = renderizarChao();
   horaAnterior = horaDoDia();
   aplicarSaveV8(d);
+  aplicarCadaveres(d.cadaveres);
+  for (const c of colonos) { c.bandBoas = c.bandBoas || 0; c.habMed = c.habMed || 0; saude(c).cap = null; }
   $('pausado').style.display = estado.pausado ? 'block' : 'none'; marcarVel();
   selecionar(colonos[0]);
 }
@@ -3624,20 +3639,20 @@ async function codigoDoSave() { // "C6:" + gzip base64 (ou "J6:" + base64 do JSO
   const txt = JSON.stringify(serializar());
   if (typeof CompressionStream === 'function') {
     const buf = await new Response(new Blob([txt]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer();
-    return 'C8:' + b64DeArray(new Uint8Array(buf));
+    return 'C10:' + b64DeArray(new Uint8Array(buf));
   }
-  return 'J8:' + btoa(unescape(encodeURIComponent(txt)));
+  return 'J10:' + btoa(unescape(encodeURIComponent(txt)));
 }
 async function saveDeTexto(t) {
   t = (t || '').trim();
   if (t.startsWith('{')) return JSON.parse(t);
-  if (/^C[678]:/.test(t)) {
+  if (/^C(6|7|8|9|10):/.test(t)) {
     if (typeof DecompressionStream !== 'function') throw new Error('este navegador não descompacta códigos; use o arquivo .json');
-    const u = arrayDeB64(t.slice(3).replace(/\s+/g, ''), Uint8Array);
+    const u = arrayDeB64(t.slice(t.indexOf(':') + 1).replace(/\s+/g, ''), Uint8Array);
     return JSON.parse(await new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream('gzip'))).text());
   }
-  if (/^J[678]:/.test(t)) return JSON.parse(decodeURIComponent(escape(atob(t.slice(3).replace(/\s+/g, '')))));
-  if (/^[CJ]\d+:/.test(t)) throw new Error(`código de outra versão (${t.slice(0, 2)})`);
+  if (/^J(6|7|8|9|10):/.test(t)) return JSON.parse(decodeURIComponent(escape(atob(t.slice(t.indexOf(':') + 1).replace(/\s+/g, '')))));
+  if (/^[CJ]\d+:/.test(t)) throw new Error(`código de outra versão (${t.slice(0, t.indexOf(':'))})`);
   throw new Error('texto não reconhecido');
 }
 async function copiarCodigo() {
@@ -3663,129 +3678,6 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) salva
    v8 — SAÚDE · TRATAMENTO · RESGATE · ANIMAIS · ARMAS · CAÇADA EM GRUPO
    Tudo que é simulação usa rnd() (semente do jogo); efeitos visuais usam rndVis().
    ===================================================================== */
-const PARTES = {
-  cabeca: { nome: 'Cabeça', g: 'cabeca' }, pescoco: { nome: 'Pescoço', g: 'cabeca' }, torso: { nome: 'Torso', g: 'torso' },
-  bracoE: { nome: 'Braço esquerdo', g: 'braco', lado: -1 }, bracoD: { nome: 'Braço direito', g: 'braco', lado: 1 },
-  maoE: { nome: 'Mão esquerda', g: 'mao', lado: -1 }, maoD: { nome: 'Mão direita', g: 'mao', lado: 1 },
-  pernaE: { nome: 'Perna esquerda', g: 'perna', lado: -1 }, pernaD: { nome: 'Perna direita', g: 'perna', lado: 1 },
-  peE: { nome: 'Pé esquerdo', g: 'pe', lado: -1 }, peD: { nome: 'Pé direito', g: 'pe', lado: 1 },
-};
-const FERIDA = { contusao: { nome: 'Contusão', dor: 0.16 }, corte: { nome: 'Corte', dor: 0.26 }, mordida: { nome: 'Mordida', dor: 0.3 }, fratura: { nome: 'Fratura', dor: 0.5 } };
-const SANGRA = { leve: 4, medio: 10, forte: 22 }; // pontos de sangue por hora
-const novaSaude = () => ({ feridas: [], sangue: 100, dor: 0, caido: false, inconsciente: false, prox: 0 });
-function saude(c) { if (!c.saude) c.saude = novaSaude(); return c.saude; }
-const nivelSangra = f => f.sangra <= 0 ? '' : f.sangra >= 18 ? 'forte' : f.sangra >= 8 ? 'médio' : 'leve';
-const corta = tipo => tipo === 'corte' || tipo === 'mordida';
-function visDe(c) { if (!c.vis) c.vis = { careta: 0, golpe: 0, bloqueio: 0, gota: 0 }; return c.vis; }
-
-function ferir(c, parte, tipo, sev, origem) {
-  const s = saude(c); sev = clamp(sev, 0.05, 1);
-  const f = { id: ++s.prox, parte, tipo, sev, sev0: sev, sangra: corta(tipo) ? (sev < 0.35 ? SANGRA.leve : sev < 0.6 ? SANGRA.medio : SANGRA.forte) : 0,
-              trat: 0, idade: 0, infec: 0, infTrat: 0, infT: 0, limpo: false, band: false, tala: false, pressionado: false };
-  s.feridas.push(f); estado.stats.feridas++;
-  const v = visDe(c); v.careta = 1; v.golpe = 0.3;
-  respingo(c.x, c.y, corta(tipo) ? 1 : 0.35);
-  log(`${c.nome}: ${FERIDA[tipo].nome.toLowerCase()} — ${PARTES[parte].nome.toLowerCase()}${origem ? ' (' + origem + ')' : ''}${f.sangra ? ', sangramento ' + nivelSangra(f) : ''}.`, 'ruim');
-  recalcularSaude(c);
-  return f;
-}
-function recalcularSaude(c) {
-  const s = saude(c); let dor = 0, inf = 0;
-  for (const f of s.feridas) { dor += FERIDA[f.tipo].dor * f.sev * (f.trat ? 0.55 : 1) * (f.tala ? 0.6 : 1) + 0.45 * f.infec; inf = Math.max(inf, f.infec); }
-  s.dor = clamp(dor, 0, 1);
-  s.inconsciente = s.sangue < 30 || s.dor > 0.95;
-  const cai = s.sangue < 40 || s.dor >= 0.85 || inf >= 0.95;
-  if (!s.caido && cai) cair(c);
-  else if (s.caido && !cai && s.sangue >= 48 && s.dor < 0.72) levantarDoChao(c);
-}
-function cair(c) {
-  const s = saude(c); s.caido = true;
-  cancelar(c); c.vel = 0; c.caminho = []; c.agachado = false;
-  c.anim = { tipo: 'desmaiar', t: 0, dur: 0.8 }; contarAnim('desmaiar');
-  estado.stats.desmaios++;
-  log(`${c.nome} desabou${s.inconsciente ? ' inconsciente' : ''} (${s.sangue < 40 ? 'perdeu muito sangue' : 'dor demais'})!`, 'ruim');
-  if (estado.stats.desmaios <= 3) carta(`${c.nome} caiu`, `${c.nome} está caído(a) e não consegue se mexer.\n\nUm colono com a prioridade Médico vai resgatá-lo(a) até uma cama e tratar os ferimentos. Bandagens (feitas na bancada) dão um tratamento muito melhor.`, 'ruim');
-}
-function levantarDoChao(c) {
-  const s = saude(c); s.caido = false;
-  if (c.carregadoPor) return;
-  if (c.tarefa && c.tarefa.tipo === 'repousar') return; // continua repousando
-  c.anim = { tipo: 'levantar', t: 0, dur: 1.3 }; contarAnim('levantar');
-  c.tarefa = null; c.caminho = [];
-  log(`${c.nome} recuperou os sentidos e se levanta.`, 'bom');
-}
-const contarAnim = an => { estado.stats.anims[an] = (estado.stats.anims[an] || 0) + 1; };
-
-function atualizarSaude(c, horas) {
-  const s = saude(c);
-  if (!s.feridas.length && s.sangue >= 100) { if (s.dor) s.dor = 0; if (s.caido) recalcularSaude(c); return; }
-  const t = c.tarefa, repouso = t && t.tipo === 'repousar' && t.fase === 'deitado', camaReal = repouso && t.camaReal;
-  let sangraTot = 0;
-  for (const f of s.feridas) {
-    f.idade += horas * 60;
-    if (f.sangra > 0) { sangraTot += f.sangra; f.sangra = Math.max(0, f.sangra - horas * (f.sangra < 8 ? 1.4 : s.caido || repouso ? 1.1 : 0.45)); } // leve coagula logo; médio/forte bem devagar (mais rápido deitado) // sangramento leve coagula sozinho
-    if (corta(f.tipo) && !f.infec && !f.infCurada && f.idade > 180 && f.trat < 0.5) {
-      if (rnd() < (f.limpo ? 0.012 : f.trat ? 0.02 : 0.05) * horas) { f.infec = 0.06; estado.stats.infeccoes++; log(`A ferida (${PARTES[f.parte].nome.toLowerCase()}) de ${c.nome} infeccionou!`, 'ruim'); }
-    }
-    if (f.infec > 0) {
-      f.imune = (f.imune || 0) + horas * (repouso || s.caido ? 0.0016 : 0.0011); // o corpo reage aos poucos
-      f.infec = clamp(f.infec + (0.028 - 0.062 * f.infTrat - f.imune) * horas, 0, 1); // tratamento fraco mal segura; sem tratamento piora
-      if (f.infec <= 0) { f.infCurada = true; f.infTrat = 0; estado.stats.infeccoesCuradas++; log(`A infecção de ${c.nome} sarou.`, 'bom'); }
-    } else f.sev -= 0.014 * (1 + 2 * f.trat) * (camaReal ? 1.7 : repouso ? 1.3 : 1) * (f.tipo === 'fratura' && !f.tala ? 0.15 : 1) * horas;
-  }
-  const n0 = s.feridas.length;
-  s.feridas = s.feridas.filter(f => f.sev > 0.02 || f.infec > 0);
-  if (s.feridas.length < n0) { estado.stats.curadas += n0 - s.feridas.length; if (!s.feridas.length) log(`${c.nome} está curado(a).`, 'bom'); }
-  s.sangue = clamp(s.sangue - sangraTot * horas + (sangraTot ? 0 : 3 * horas), 12, 100);
-  recalcularSaude(c);
-}
-function piorEm(c, grupos) {
-  let w = 0, f0 = null;
-  if (c.saude) for (const f of c.saude.feridas) if (grupos.includes(PARTES[f.parte].g)) {
-    const v = f.sev * (f.tipo === 'fratura' ? (f.tala ? 0.7 : 1.1) : 0.6) * (f.trat ? 0.75 : 1) + f.infec * 0.3;
-    if (v > w) { w = v; f0 = f; }
-  }
-  return { w, f: f0 };
-}
-const fatorMov = c => !c.saude || !c.saude.feridas.length ? 1 : clamp(1 - 0.6 * piorEm(c, ['perna', 'pe']).w, 0.3, 1) * (1 - 0.25 * c.saude.dor);
-const fatorTrab = c => !c.saude || !c.saude.feridas.length ? 1 : clamp(1 - 0.5 * piorEm(c, ['braco', 'mao']).w, 0.4, 1) * (1 - 0.2 * c.saude.dor);
-const infecPede = f => f.infec > 0 && (!f.infTrat || (f.infTrat < 0.6 && agora() - f.infT > 360));
-const feridaPede = f => infecPede(f) || (!f.trat && (f.sangra > 0 || f.tipo !== 'contusao' || f.sev > 0.3));
-const precisaTratar = c => !!c.saude && c.saude.feridas.some(feridaPede);
-const PRIO_FERIDA = f => (f.sangra >= 18 ? 0 : infecPede(f) ? 1 : f.sangra > 0 ? 2 : f.tipo === 'fratura' ? 3 : 4) - f.sev * 0.5;
-
-// ---- escolha do tratamento (cada um tem uma animação própria) ----
-const GRUPO_TRAT = { cabeca: 'tratarCabeca', torso: 'tratarTorso', braco: 'tratarBraco', mao: 'tratarMao', perna: 'tratarPerna', pe: 'tratarPe' };
-const GRUPO_BAND = { cabeca: 'bandagemCabeca', torso: 'bandagemTorso', braco: 'bandagemBraco', mao: 'bandagemBraco', perna: 'bandagemPerna', pe: 'bandagemPerna' };
-const NOME_TRAT = { tratarPerna: 'trata a perna', tratarPe: 'trata o pé', tratarBraco: 'trata o braço', tratarMao: 'trata a mão', tratarCabeca: 'trata a cabeça', tratarTorso: 'trata o torso',
-  bandagemPerna: 'enfaixa a perna', bandagemBraco: 'enfaixa o braço', bandagemCabeca: 'enfaixa a cabeça', bandagemTorso: 'enfaixa o torso', talaPerna: 'imobiliza a perna (tala)', talaBraco: 'imobiliza o braço (tala)',
-  pressionar: 'pressiona o sangramento', limpar: 'limpa e desinfeta a ferida', tratarInfeccao: 'trata a infecção', examinar: 'examina (pulso)', ajudarSentar: 'ajuda a sentar', tratarNaCama: 'cuida na cama' };
-const DUR_TRAT = { pressionar: 24, limpar: 16, tratarInfeccao: 34, examinar: 12, ajudarSentar: 14, tratarNaCama: 26, talaPerna: 40, talaBraco: 36,
-  bandagemPerna: 30, bandagemBraco: 28, bandagemCabeca: 30, bandagemTorso: 32 };
-function escolherTratamento(p, f, temBand) {
-  const g = PARTES[f.parte].g;
-  if (infecPede(f)) return 'tratarInfeccao';
-  if (f.sangra >= 18 && !f.pressionado) return 'pressionar';
-  if (f.tipo === 'fratura' && !f.tala) return g === 'perna' || g === 'pe' ? 'talaPerna' : 'talaBraco';
-  if (corta(f.tipo) && !f.limpo) return 'limpar';
-  if (f.tipo !== 'contusao' && temBand) return GRUPO_BAND[g];
-  if (pacienteNaCama(p) && f.tipo === 'contusao') return 'tratarNaCama';
-  return GRUPO_TRAT[g];
-}
-function aplicarTratamento(m, p, f, an) {
-  const usa = () => { if (m.bandagens > 0) { m.bandagens--; estado.stats.bandagensUsadas++; return true; } return false; };
-  estado.stats.tratamentos++;
-  if (an === 'examinar') { saude(p).examinado = agora(); return; }
-  if (an === 'ajudarSentar') { p.sentado = true; return; }
-  if (!f) return;
-  if (an === 'pressionar') { f.pressionado = true; f.sangra = Math.min(f.sangra, 6); }
-  else if (an === 'limpar') f.limpo = true;
-  else if (an === 'tratarInfeccao') { f.infTrat = usa() ? 0.85 + rnd() * 0.1 : 0.4 + rnd() * 0.12; f.infT = agora(); estado.stats.infeccoesTratadas++; }
-  else if (an.startsWith('tala')) { f.tala = true; f.band = usa(); f.trat = f.band ? 0.85 : 0.55; }
-  else if (an.startsWith('bandagem')) { f.band = usa(); f.trat = f.band ? 0.8 + rnd() * 0.15 : 0.4; f.sangra = 0; }
-  else { f.trat = Math.max(f.trat, 0.35 + rnd() * 0.12); f.sangra = 0; }
-  recalcularSaude(p);
-}
 const pacienteNaCama = p => !!(p.tarefa && p.tarefa.tipo === 'repousar' && p.tarefa.fase === 'deitado' && p.tarefa.camaReal);
 const pacienteDeitado = p => !!(saude(p).caido || (p.tarefa && p.tarefa.tipo === 'repousar' && p.tarefa.fase === 'deitado'));
 const ocupaCama = q => !!(q && (q.carregadoPor || q.resgatador || (q.tarefa && ['repousar', 'apoiado', 'esperarAjuda'].includes(q.tarefa.tipo))));
@@ -3799,7 +3691,7 @@ function escolherCama(p) {
 function deitarNaCama(p, cama) {
   p.x = p.ax = cama.x; p.y = p.ay = cama.y; p.caminho = []; p.vel = p.avel = 0;
   p.tarefa = { tipo: 'repousar', fase: 'deitado', cama, camaReal: cama.real, desde: agora() };
-  p.anim = { tipo: 'deitar', t: 0, dur: 0.6, naCama: cama.real }; p.sentado = false; p.yawAlvo = 0;
+  p.anim = { tipo: 'deitar', t: 0, dur: 0.9, naCama: cama.real }; p.sentado = false; p.yawAlvo = 0;
 }
 function querRepousar(c) {
   const s = c.saude; if (!s || s.caido || !s.feridas.length || (c.saiuCama || -1e9) > agora() - 90) return false;
@@ -3828,7 +3720,7 @@ function criarAnimal(esp, x, y, extra = {}) {
   const E = ESP_ANIMAL[esp];
   const a = Object.assign({ animal: true, id: ++idAnimal, esp, nome: E.nome, x, y, ax: x, ay: y, dist: 0, adist: 0, vel: 0, avel: 0, yawAlvo: rnd() * 6.28, yawVis: 0, caminho: [],
     hp: E.hp, estado: esp === 'veado' ? 'pastar' : 'vagar', t: 0, pensar: rnd() * 2, cd: 0, atk: 0, alerta: 0, stamina: 1, casa: { x, y }, morto: false, acaoF: 0, aAcaoF: 0,
-    chifre: esp === 'veado' && rnd() < 0.5, mola: { y: 0, v: 0 } }, extra);
+    chifre: esp === 'veado' && rnd() < 0.5, mola: { y: 0, v: 0 }, saude: novaSaude() }, extra);
   animais.push(a); return a;
 }
 function regiaoColonia() { const c = colonos.find(c => !saude(c).caido) || colonos[0]; return mapa.regiao[idx(Math.round(c.x), Math.round(c.y))]; }
@@ -3916,6 +3808,7 @@ function atacar(a, c, motivo) {
 function atualizarAnimal(a, dt) {
   const E = ESP_ANIMAL[a.esp];
   if (a.morto) { a.t += dt; if (a.t > 1.6) { removerAnimal(a); largarItem(Math.round(a.x), Math.round(a.y), E.carc, 1); } return; }
+  if (a.saude && a.saude.caido) { a.estado = 'caido'; a.alvo = null; a.t += dt; a.vel = Math.max(0, a.vel - dt * 20); a.andando = false; a.caminho = []; return; }
   a.cd -= dt; a.pensar -= dt; a.t += dt;
   a.stamina = Math.min(1, a.stamina + dt * 0.04);
   const viu = perceber(a, dt);
@@ -3973,25 +3866,8 @@ function atualizarAnimal(a, dt) {
       a.pensar = 2 + rnd() * 4;
     }
   }
-  if (lento > 0 || a.caminho.length) mover(a, dt, lento || E.anda); else { a.vel = Math.max(0, a.vel - dt * 20); a.andando = false; }
+  if (lento > 0 || a.caminho.length) mover(a, dt, (lento || E.anda) * fatorMovAnimal(a)); else { a.vel = Math.max(0, a.vel - dt * 20); a.andando = false; }
 }
-function golpeAnimal(a, c) {
-  const v = visDe(c);
-  if (c.escudo && rnd() < 0.42) { v.bloqueio = 0.5; estado.stats.bloqueios++; faiscasEscudo(c, a); return; }
-  if (rnd() > (a.esp === 'urso' ? 0.7 : 0.55)) return; // errou
-  estado.stats.ataques++;
-  const tab = a.esp === 'urso' ? [['torso', 4], ['cabeca', 1.4], ['bracoE', 2], ['bracoD', 2], ['pernaE', 1.5], ['pernaD', 1.5], ['maoE', 1], ['maoD', 1]]
-    : [['pernaE', 3], ['pernaD', 3], ['peE', 1.6], ['peD', 1.6], ['bracoE', 2], ['bracoD', 2], ['maoE', 1], ['maoD', 1], ['torso', 1.8], ['pescoco', 0.4]];
-  let r = rnd() * tab.reduce((s, x) => s + x[1], 0), parte = tab[0][0];
-  for (const [p, w] of tab) { if ((r -= w) <= 0) { parte = p; break; } }
-  const q = rnd(), membro = !['torso', 'cabeca', 'pescoco'].includes(parte);
-  let tipo, sev;
-  if (a.esp === 'urso') { if (q < 0.5) { tipo = 'corte'; sev = 0.4 + rnd() * 0.45; } else if (q < 0.75 && membro) { tipo = 'fratura'; sev = 0.45 + rnd() * 0.35; } else { tipo = 'contusao'; sev = 0.3 + rnd() * 0.4; } }
-  else { if (q < 0.68) { tipo = 'mordida'; sev = 0.2 + rnd() * 0.42; } else if (q < 0.93 || !membro) { tipo = 'contusao'; sev = 0.2 + rnd() * 0.3; } else { tipo = 'fratura'; sev = 0.4 + rnd() * 0.3; } }
-  ferir(c, parte, tipo, sev, a.nome.toLowerCase());
-}
-/* ------------------------------ ARMAS E LUTA ------------------------------ */
-const ARMAS = { espada: { nome: 'Espada', dano: 15, anim: 'espada' }, arco: { nome: 'Arco', dano: 13, anim: 'arco', distancia: 7.5 } };
 function animArma(c) {
   if (c.arma === 'arco' && c.flechas > 0) return 'arco';
   if (c.arma === 'espada') return 'espada';
@@ -4010,32 +3886,6 @@ function iniciarFuga(c, de) {
   const cam = fugirDe(c, de, 10);
   c.tarefa = { tipo: 'fugir', de, ate: agora() + 30 }; c.caminho = cam || [];
   log(`${c.nome} foge do ${de.nome.toLowerCase()}!`, 'ruim');
-}
-function golpearAnimal(c, a, tp) {
-  const d = Math.hypot(a.x - c.x, a.y - c.y);
-  if (tp === 'arco') {
-    if (c.flechas <= 0) return;
-    c.flechas--; estado.stats.flechas++;
-    const acerta = rnd() < clamp(0.88 - d * 0.04 - (a.vel > 2.2 ? 0.18 : 0) - (saude(c).dor * 0.2), 0.25, 0.92);
-    const ex = acerta ? 0 : (rnd() - 0.5) * 2.4, ey = acerta ? 0 : (rnd() - 0.5) * 2.4;
-    projeteis.push({ x0: c.x, y0: c.y, x1: a.x + ex, y1: a.y + ey, t: 0, dur: Math.max(0.12, d / 17), presa: a, acerta, dano: 11 + rnd() * 6, autor: c });
-    a.alerta = 1.2; return;
-  }
-  if (rnd() > (tp === 'socar' ? 0.7 : 0.82)) return;
-  ferirAnimal(a, DANO_ANIM[tp] * (0.6 + 0.4 * fatorTrab(c)) * (0.85 + rnd() * 0.3), c);
-}
-function ferirAnimal(a, dano, autor) {
-  if (a.morto) return;
-  a.hp -= dano; visDe(a).golpe = 0.3; a.alerta = 1.5; a.cacado = true;
-  respingo(a.x, a.y, 0.8);
-  if (a.hp <= 0) return morrerAnimal(a, autor);
-  if (a.esp === 'veado') { if (a.stamina > 0.15 && a.estado !== 'fugir') { const cam = fugirDe(a, autor, 10); if (cam) { a.estado = 'fugir'; a.caminho = cam; a.stamina -= 0.3; } } }
-  else if (a.estado !== 'partir') { atacar(a, autor, null); for (const o of animais) if (o !== a && o.bando === a.bando && !o.morto && o.estado !== 'partir' && o.estado !== 'atacar') atacar(o, autor, null); }
-}
-function morrerAnimal(a, autor) {
-  a.morto = true; a.estado = 'morto'; a.t = 0; a.caminho = []; a.vel = 0; a.cacar = false;
-  estado.stats.abatidos++;
-  log(`${autor ? autor.nome + ' abateu' : 'Morreu'} um(a) ${a.nome.toLowerCase()}. A carcaça pode ser carneada na bancada.`, 'bom');
 }
 function atualizarProjeteis(dt) {
   for (let k = projeteis.length - 1; k >= 0; k--) {
@@ -4163,13 +4013,13 @@ function atualizarColonoV8(c, dt, horas) {
     const tp = c.tarefa && c.tarefa.tipo;
     if (atk && tp !== 'lutar' && tp !== 'fugir' && tp !== 'resgatar') {
       const armado = c.arma || c.ferramentas.machado || c.ferramentas.picareta;
-      if ((armado || atk.esp === 'lobo') && s.dor < 0.5) { lutar(c, atk); log(`${c.nome} enfrenta o ${atk.nome.toLowerCase()}${c.arma ? ' com ' + (c.arma === 'arco' ? 'o arco' : 'a espada') : armado ? ' com a ferramenta' : ' com os punhos'}!`); }
+      if ((armado || atk.esp === 'lobo') && s.dor < 0.5 && capDe(c).movimento > 0.45) { lutar(c, atk); log(`${c.nome} enfrenta o ${atk.nome.toLowerCase()}${c.arma ? ' com ' + (c.arma === 'arco' ? 'o arco' : 'a espada') : armado ? ' com a ferramenta' : ' com os punhos'}!`); }
       else iniciarFuga(c, atk);
       for (const o of colonos) {
         if (o === c || saude(o).caido || o.carregadoPor || Math.hypot(o.x - c.x, o.y - c.y) > 14) continue;
         const ot = o.tarefa && o.tarefa.tipo;
         if (['lutar', 'resgatar', 'tratar', 'cacada', 'fugir', 'repousar'].includes(ot)) continue;
-        if (o.arma || o.ferramentas.machado || o.ferramentas.picareta) { lutar(o, atk); log(`${o.nome} corre para ajudar ${c.nome}!`); }
+        if ((o.arma || o.ferramentas.machado || o.ferramentas.picareta) && (saude(o).dor || 0) < 0.45 && capDe(o).movimento > 0.5) { lutar(o, atk); log(`${o.nome} corre para ajudar ${c.nome}!`); }
       }
     }
   }
@@ -4212,7 +4062,6 @@ function candidatosV8(c, P, cands) {
   if (P.medico && !saude(c).caido) for (const p of colonos) {
     if (p === c || p.medico || p.carregadoPor || p.resgatador || !precisaTratar(p)) continue;
     if (p.tarefa && ['lutar', 'fugir', 'cacada', 'apoiado', 'esperarAjuda'].includes(p.tarefa.tipo)) continue;
-    if (p.tarefa && p.tarefa.tipo === 'repousar' && p.tarefa.fase === 'indo') continue;
     cands.medico.push({ x: Math.round(p.x), y: Math.round(p.y), adj: true, v8: 'tratar', p });
   }
   if (P.caca && !saude(c).caido) for (const a of animais) if (a.cacar && !a.morto && !colonos.some(o => o.tarefa && o.tarefa.presa === a && o.tarefa.job))
@@ -4225,8 +4074,8 @@ function iniciarV8(c, r) {
     const p = a.p; p.medico = c;
     const t = { tipo: 'tratar', paciente: p, fase: 'ir', rp: 0, progresso: 0, total: 0 };
     const precisaBand = saude(p).feridas.some(f => f.tipo !== 'contusao' && !f.band);
-    if (c.bandagens < 2 && precisaBand) {
-      const bs = itens.filter(it => it.tipo === 'BANDAGEM' && !it.reservado).map(it => ({ x: it.x, y: it.y, adj: false, item: it }));
+    if ((c.bandagens || 0) + (c.bandBoas || 0) < 2 && precisaBand) {
+      const bs = itens.filter(it => (it.tipo === 'BANDAGEM' || it.tipo === 'BANDAGEM_BOA') && !it.reservado).sort((a, b) => (b.tipo === 'BANDAGEM_BOA') - (a.tipo === 'BANDAGEM_BOA')).map(it => ({ x: it.x, y: it.y, adj: false, item: it }));
       const rb = bs.length && melhorAlvo(c, bs, 2);
       if (rb) { rb.alvo.item.reservado = c; t.fase = 'buscar'; t.item = rb.alvo.item; c.tarefa = t; c.caminho = rb.caminho; return true; }
     }
@@ -4244,7 +4093,7 @@ function tentarEquipar(c) {
   };
   const caca = c.prioridades.caca && c.prioridades.caca <= 2;
   return busca('ARCO', !c.arma && caca) || busca('ESPADA', !c.arma) || busca('ARCO', !c.arma) || busca('ESCUDO', !c.escudo && c.arma !== 'arco')
-    || busca('FLECHAS', c.arma === 'arco' && c.flechas < 8) || busca('BANDAGEM', c.prioridades.medico && c.bandagens < 2);
+    || busca('FLECHAS', c.arma === 'arco' && c.flechas < 8) || busca('BANDAGEM_BOA', c.prioridades.medico && (c.bandBoas || 0) < 2) || busca('BANDAGEM', c.prioridades.medico && (c.bandagens || 0) + (c.bandBoas || 0) < 2);
 }
 function equipar(c, it) {
   const tp = it.tipo;
@@ -4253,8 +4102,8 @@ function equipar(c, it) {
     c.arma = tp.toLowerCase(); removerItem(it);
     if (c.arma === 'arco' && c.escudo) { c.escudo = false; largarItem(Math.round(c.x), Math.round(c.y), 'ESCUDO', 1); log(`${c.nome} deixou o escudo: o arco usa as duas mãos.`); }
   } else if (tp === 'ESCUDO') { if (c.arma === 'arco') { it.reservado = null; return; } c.escudo = true; removerItem(it); }
-  else if (tp === 'FLECHAS' || tp === 'BANDAGEM') {
-    const campo = tp === 'FLECHAS' ? 'flechas' : 'bandagens', max = tp === 'FLECHAS' ? 20 : 4, q = Math.min(max - (c[campo] || 0), it.qtd);
+  else if (tp === 'FLECHAS' || tp === 'BANDAGEM' || tp === 'BANDAGEM_BOA') {
+    const campo = tp === 'FLECHAS' ? 'flechas' : tp === 'BANDAGEM_BOA' ? 'bandBoas' : 'bandagens', max = tp === 'FLECHAS' ? 20 : 4, q = Math.min(max - (c[campo] || 0), it.qtd);
     c[campo] = (c[campo] || 0) + q; it.qtd -= q; it.reservado = null; if (it.qtd <= 0) removerItem(it);
   }
   log(`${c.nome} equipou ${ITEM[tp].nome.toLowerCase()}.`);
@@ -4297,7 +4146,7 @@ function executarV8(c, dt, min) {
         if (agora() - t.ini > 240) { falhas.set(idx(Math.round(p.x), Math.round(p.y)), agora() + 60); p.resgatador = null; fim(c); return true; }
         if (d > 2.4 || (d > 1.6 && !chegou)) { if (chegou || (t.rp -= dt) <= 0) { t.rp = 1; const s = tileDe(c), cam = aEstrela(s.x, s.y, Math.round(p.x), Math.round(p.y), true); if (!cam) { falhas.set(idx(Math.round(p.x), Math.round(p.y)), agora() + 60); p.resgatador = null; fim(c); } else if (!cam.length && d <= 2.4) { /* já está ao lado */ } else c.caminho = cam; } if (d > 2.4 || c.caminho.length) return true; }
         c.caminho = []; virarPara(c, p.x, p.y);
-        const fb = saude(p).feridas.find(f => f.sangra >= 18 && !f.pressionado);
+        const fb = taxaSangramento(p) >= 6 && saude(p).feridas.filter(f => f.sangra >= 2.5 && !f.pressionado && !f.band).sort((a, b) => b.sangra - a.sangra)[0];
         if (fb) { t.fase = 'estabilizar'; t.f = fb; t.anim = 'pressionar'; t.progresso = 0; t.total = DUR_TRAT.pressionar; c.acaoF = c.aAcaoF = 0; contarAnim('pressionar'); log(`${c.nome} pressiona o sangramento de ${p.nome} antes de carregá-lo(a).`); return true; }
         t.fase = 'pegando'; t.t = 0; t.cama = (p.tarefa && p.tarefa.cama) || escolherCama(p); if (t.cama.real && t.cama.ref) t.cama.ref.paciente = p;
         t.estilo = estiloResgate(c, p); return true;
@@ -4309,7 +4158,7 @@ function executarV8(c, dt, min) {
       }
       if (t.fase === 'pegando') {
         virarPara(c, p.x, p.y); t.t += dt;
-        if (t.t >= 0.9) {
+        if (t.t >= DUR_PEGAR) {
           const s = tileDe(c), cam = aEstrela(s.x, s.y, t.cama.x, t.cama.y);
           p.carregadoPor = c; p.pedeAjuda = false;
           if (!cam) { deitarNaCama(p, { x: s.x, y: s.y, real: false }); p.carregadoPor = null; p.resgatador = null; fim(c); return true; }
@@ -4321,7 +4170,7 @@ function executarV8(c, dt, min) {
       if (t.fase === 'levando') { seguirCarregado(c, p, t); if (chegou) { t.fase = 'soltando'; t.t = 0; } return true; }
       if (t.fase === 'soltando') {
         t.t += dt;
-        if (t.t >= 0.9) { p.carregadoPor = null; p.resgatador = null; deitarNaCama(p, t.cama); if (t.cama.ref) t.cama.ref.paciente = p; estado.stats.resgates++; log(`${p.nome} foi levado(a) para ${t.cama.real ? 'a cama (médica)' : 'o saco de dormir'}.`, 'bom'); t.paciente = null; fim(c); afastarDoPaciente(c, p); if (c.caminho.length) c.tarefa = { tipo: 'vagar', fase: 'indo' }; }
+        if (t.t >= DUR_SOLTAR) { p.carregadoPor = null; p.resgatador = null; deitarNaCama(p, t.cama); if (t.cama.ref) t.cama.ref.paciente = p; estado.stats.resgates++; log(`${p.nome} foi levado(a) para ${t.cama.real ? 'a cama (médica)' : 'o saco de dormir'}.`, 'bom'); t.paciente = null; fim(c); afastarDoPaciente(c, p); if (c.caminho.length) c.tarefa = { tipo: 'vagar', fase: 'indo' }; }
         return true;
       }
       return true;
@@ -4333,7 +4182,7 @@ function executarV8(c, dt, min) {
         if (!itemExiste(t.item)) { t.fase = 'ir'; return true; }
         if (!chegou) return true;
         const it = t.item, q = Math.min(3, it.qtd); it.qtd -= q; it.reservado = null; if (it.qtd <= 0) removerItem(it);
-        c.bandagens = (c.bandagens || 0) + q; t.item = null; t.fase = 'ir'; return true;
+        if (it.tipo === 'BANDAGEM_BOA') c.bandBoas = (c.bandBoas || 0) + q; else c.bandagens = (c.bandagens || 0) + q; t.item = null; t.fase = 'ir'; return true;
       }
       if (t.fase === 'ir') {
         const d = Math.hypot(p.x - c.x, p.y - c.y);
@@ -4367,11 +4216,12 @@ function executarV8(c, dt, min) {
     case 'lutar': {
       const a = t.presa;
       if (!a || a.morto || !animais.includes(a)) { fim(c); c.pensarT = 1; return true; }
+      if (!t.job && !t.cacada && ((saude(c).dor || 0) > 0.6 || capDe(c).movimento < 0.35) && !(a.saude && a.saude.caido)) { log(`${c.nome}, muito ferido(a), recua do ${a.nome.toLowerCase()}.`, 'ruim'); fim(c); iniciarFuga(c, a); return true; }
       t.ini = t.ini || agora();
       if (t.segurar && t.cacada && cacadas.includes(t.cacada) && agora() - t.ini < 30 && t.segurar(c, t)) { c.caminho = []; c.agachado = true; virarPara(c, a.x, a.y); return true; }
       c.agachado = false;
       const d = Math.hypot(a.x - c.x, a.y - c.y), arco = c.arma === 'arco' && c.flechas > 0;
-      const alcance = arco ? 7.5 : 1.6; // inclui a diagonal
+      const alcance = arco ? 7.5 : (a.saude && a.saude.caido ? 2.1 : 1.9); // inclui a diagonal (e o tamanho do bicho)
       t.rp -= dt;
       t.ini = t.ini || agora();
       const fugindo = a.estado === 'partir' && d > alcance + 1.5, limite = t.cacada ? 300 : t.job ? 360 : 150;
@@ -4416,6 +4266,7 @@ function tipoAcaoV8(c, t) {
   if (t.tipo === 'resgatar' && t.fase === 'estabilizar') return 'pressionar';
   if (t.tipo === 'lutar' && t.fase === 'fazendo') return animArma(c);
   if (t.tipo === 'fabricar' && t.bancada && t.bancada.fazendo && t.bancada.fazendo.startsWith('CARNEAR')) return 'entalhar';
+  if (t.tipo === 'fabricar' && t.bancada && t.bancada.fazendo && t.bancada.fazendo.startsWith('BANDAGEM')) return 'enrolar';
   return null;
 }
 function descreverTarefaV8(c, t) {
@@ -4459,14 +4310,25 @@ function autoPedidos() {
   if (!mapa.bancadas.length) return;
   const est = estoque(), q = k => estado.pedidos.filter(p => p === k).length + mapa.bancadas.filter(b => b.fazendo === k).length;
   for (const esp of ['VEADO', 'LOBO', 'URSO']) if ((est['CARC_' + esp] || 0) > q('CARNEAR_' + esp)) { estado.pedidos.push('CARNEAR_' + esp); log(`Pedido automático: carnear ${esp.toLowerCase()}.`); }
-  const band = (est.BANDAGEM || 0) + colonos.reduce((s, c) => s + (c.bandagens || 0), 0);
-  if (band + 3 * q('BANDAGEM') + q('BANDAGEM_FIBRA') < 4) {
-    if ((est.PELE || 0) >= 1) estado.pedidos.push('BANDAGEM'); else if ((est.FRUTAS || 0) >= 40) estado.pedidos.push('BANDAGEM_FIBRA');
+  const band = (est.BANDAGEM || 0) + (est.BANDAGEM_BOA || 0) + colonos.reduce((s, c) => s + (c.bandagens || 0) + (c.bandBoas || 0), 0);
+  if (band + 3 * q('BANDAGEM') + 2 * q('BANDAGEM_BOA') + q('BANDAGEM_FIBRA') < 4) {
+    if ((est.PELE || 0) >= 1 && (est.FRUTAS || 0) >= 30) estado.pedidos.push('BANDAGEM_BOA'); else if ((est.PELE || 0) >= 1) estado.pedidos.push('BANDAGEM'); else if ((est.FRUTAS || 0) >= 40) estado.pedidos.push('BANDAGEM_FIBRA');
   }
   if (q('FLECHAS') === 0 && colonos.some(c => c.arma === 'arco' && c.flechas < 8) && !(est.FLECHAS > 4) && (est.MADEIRA || 0) >= 10) estado.pedidos.push('FLECHAS');
 }
 let acumV8 = 0;
+function autoTratar(c, minutos) { // ninguém mais pode cuidar: trata a si mesmo(a) devagar e pior (como o RimWorld)
+  const s = saude(c); if (s.caido || s.morto || c.visitante || !precisaTratar(c) || c.medico || (c.tarefa && ['lutar', 'fugir', 'resgatar', 'tratar', 'cacada'].includes(c.tarefa.tipo))) { c.autoT = 0; return; }
+  if (colonos.some(o => o !== c && o.prioridades.medico && !saude(o).caido)) { c.autoT = 0; return; }
+  c.autoT = (c.autoT || 0) + minutos; if (c.autoT < 45) return; c.autoT = 0;
+  const f = s.feridas.filter(feridaPede).sort((a, b) => PRIO_FERIDA(a) - PRIO_FERIDA(b))[0]; if (!f) return;
+  const an = infecPede(f) ? 'tratarInfeccao' : escolherTratamento(c, f); if (!an) return;
+  const h = habMed(c); c.habMed = Math.max(0, h - 3); aplicarTratamento(c, c, f, an); c.habMed = h + ((c.habMed || 0) - Math.max(0, h - 3));
+  st10('autoTratamentos'); log(`${c.nome} cuida da própria ferida (${PARTES[f.parte].nome.toLowerCase()}) — sem médico livre.`);
+}
 function atualizarV8(dt, minutos) {
+  if (minutos > 0) for (const c of colonos) autoTratar(c, minutos);
+  if (minutos > 0) for (const a of animais) if (!a.morto && a.saude) atualizarSaude(a, minutos / 60);
   for (const a of animais.slice()) atualizarAnimal(a, dt);
   atualizarProjeteis(dt); atualizarCacadas(dt);
   acumV8 += minutos;
@@ -4659,7 +4521,7 @@ function desenharCarregado(p, X, Y, ang, esc, ex) {
   desenharColono(ctx, p, 0, 0, Object.assign({ yaw: 0, fechados: saude(p).inconsciente, curativos: curativosDe(p), respira: Math.sin(tempoReal * 2) * 0.3 }, ex));
   ctx.restore();
 }
-function prepararPose(c, x, y) {
+function prepararPoseV8(c, x, y) {
   if (!c.saude || c.visitante) return null;
   const ex = extrasFerido(c);
   // carregado por alguém: quem carrega desenha (menos no apoio, em que anda junto)
@@ -4746,83 +4608,19 @@ function prepararPose(c, x, y) {
   if (t && t.tipo === 'resgatar' && t.fase === 'indo' && t.estilo === 'apoio') return { extra: ex };
   return { extra: ex };
 }
-/* ---- animais (vista de cima, pernas animadas pelo passo) ---- */
-function corpoAnimal(g, esp, o) {
-  const E = ESP_ANIMAL[esp], F = (o.fase || 0) * TAU, w = o.w || 0, morte = o.morte || 0, corre = o.corre;
-  const L = E.L * (1 + (corre ? Math.sin(F * 2) * 0.08 : 0)), W = E.W, cab = esp === 'urso' ? 5.6 : esp === 'lobo' ? 4.2 : 3.8;
-  g.lineJoin = 'round'; g.lineCap = 'round';
-  // pernas: passo alternado; galope = pares em sincronia
-  const pernas = [[1, -1, 0], [1, 1, Math.PI], [-1, -1, corre ? 0.4 : Math.PI], [-1, 1, corre ? 0.4 : 0]];
-  for (const [fr, sd, ph] of pernas) {
-    let px = fr * L * 0.33, py = sd * W * 0.85;
-    if (morte) { py = sd * (W + 4.5 * morte); px += fr * 2 * morte; }
-    else { px += Math.sin(F + ph) * (corre ? 4.2 : 2.6) * w; py += sd * Math.max(0, Math.cos(F + ph)) * 0.6 * w; }
-    g.beginPath(); g.moveTo(fr * L * 0.3, sd * W * 0.45); g.lineTo(px, py); g.lineWidth = esp === 'urso' ? 4.4 : 2.6; g.strokeStyle = CONTORNO; g.stroke(); g.lineWidth = esp === 'urso' ? 3 : 1.5; g.strokeStyle = E.escuro; g.stroke();
-    circulo(g, px, py, esp === 'urso' ? 2.4 : 1.4); g.fillStyle = esp === 'veado' ? '#3a2a1a' : E.escuro; g.fill(); g.lineWidth = 0.8; g.strokeStyle = CONTORNO; g.stroke();
-  }
-  // cauda
-  const ca = Math.sin(o.t * (esp === 'lobo' ? 5 : 3)) * 0.35 * (1 - morte);
-  g.save(); g.translate(-L / 2, 0); g.rotate(Math.PI + ca);
-  if (esp === 'lobo') { elipse(g, 4.2, 0, 4.6, 1.9); g.fillStyle = E.cor; g.fill(); g.lineWidth = 1.1; g.strokeStyle = CONTORNO; g.stroke(); elipse(g, 7.4, 0, 1.6, 1.2); g.fillStyle = E.claro; g.fill(); }
-  else if (esp === 'veado') { elipse(g, 1.6, 0, 2, 1.6); g.fillStyle = '#f4efe6'; g.fill(); g.lineWidth = 0.9; g.strokeStyle = CONTORNO; g.stroke(); }
-  else { circulo(g, 1.2, 0, 1.7); g.fillStyle = E.cor; g.fill(); g.lineWidth = 0.9; g.strokeStyle = CONTORNO; g.stroke(); }
-  g.restore();
-  // corpo
-  elipse(g, 0, 0, L / 2, W); g.fillStyle = E.cor; g.fill();
-  g.save(); g.clip(); elipse(g, 0, W * 0.55, L / 2, W * 0.55); g.fillStyle = 'rgba(0,0,0,.18)'; g.fill();
-  if (esp === 'lobo') { elipse(g, -1, -W * 0.25, L * 0.4, W * 0.35); g.fillStyle = E.escuro; g.fill(); }
-  if (esp === 'veado') for (const [sx, sy] of [[-3, -1.5], [0, -2.2], [3, -1.2], [-1.2, 0.3]]) { circulo(g, sx, sy, 0.7); g.fillStyle = 'rgba(255,245,225,.75)'; g.fill(); }
-  if (esp === 'urso') { elipse(g, -2, -W * 0.3, L * 0.3, W * 0.4); g.fillStyle = 'rgba(255,255,255,.08)'; g.fill(); }
-  g.restore(); elipse(g, 0, 0, L / 2, W); g.lineWidth = 1.5; g.strokeStyle = CONTORNO; g.stroke();
-  if (o.flash) { elipse(g, 0, 0, L / 2, W); g.fillStyle = `rgba(255,255,255,${o.flash})`; g.fill(); }
-  // cabeça (abaixa para pastar, avança no ataque)
-  const pasta = o.pasta || 0, atk = o.atk || 0;
-  const hx = L / 2 + cab * 0.55 + pasta * 2 + Math.sin(atk * Math.PI) * 4, hy = Math.sin(o.t * 9) * 0.5 * pasta;
-  g.save(); g.translate(hx, hy); g.scale(1 - pasta * 0.12, 1 - pasta * 0.12);
-  if (esp === 'veado' && o.chifre && !pasta) { g.beginPath(); for (const sd of [-1, 1]) { g.moveTo(-1, sd * 1.5); g.lineTo(-4.5, sd * 4.5); g.lineTo(-7, sd * 4); g.moveTo(-4.5, sd * 4.5); g.lineTo(-5.5, sd * 7); } g.lineWidth = 1.6; g.strokeStyle = CONTORNO; g.stroke(); g.lineWidth = 0.9; g.strokeStyle = '#d9c9a0'; g.stroke(); }
-  for (const sd of [-1, 1]) { g.beginPath(); const ex = esp === 'urso' ? 1.5 : 0; g.moveTo(-1.5, sd * (cab * 0.5)); g.lineTo(-3.2 - ex, sd * (cab * 0.95 + ex)); g.lineTo(0.2, sd * (cab * 0.8)); g.closePath(); g.fillStyle = esp === 'veado' ? E.escuro : E.cor; g.fill(); g.lineWidth = 1; g.strokeStyle = CONTORNO; g.stroke(); }
-  elipse(g, 0, 0, cab, cab * 0.85); g.fillStyle = E.cor; g.fill(); g.lineWidth = 1.3; g.strokeStyle = CONTORNO; g.stroke();
-  // focinho; lobo abre a boca no ataque
-  const boca = esp === 'lobo' ? Math.sin(atk * Math.PI) : 0;
-  if (boca > 0.1) { g.beginPath(); g.moveTo(cab * 0.6, 0); g.lineTo(cab + 3.2, -1.8 - boca * 1.6); g.lineTo(cab + 3.2, 1.8 + boca * 1.6); g.closePath(); g.fillStyle = '#7a1e1e'; g.fill(); g.lineWidth = 0.8; g.stroke(); }
-  elipse(g, cab * 0.85, 0, esp === 'urso' ? 2.6 : 2.4, esp === 'veado' ? 1.4 : 1.7); g.fillStyle = E.claro; g.fill(); g.lineWidth = 0.9; g.strokeStyle = CONTORNO; g.stroke();
-  circulo(g, cab * 0.85 + 2, 0, 0.8); g.fillStyle = '#16120e'; g.fill();
-  for (const sd of [-1, 1]) { if (morte > 0.5) { g.beginPath(); g.moveTo(0.4, sd * 1.6 - 0.6); g.lineTo(1.6, sd * 1.6 + 0.6); g.moveTo(1.6, sd * 1.6 - 0.6); g.lineTo(0.4, sd * 1.6 + 0.6); g.lineWidth = 0.6; g.strokeStyle = '#16120e'; g.stroke(); } else { circulo(g, 1, sd * 1.7, 0.6); g.fillStyle = esp === 'lobo' ? '#e9c64a' : '#16120e'; g.fill(); } }
-  g.restore();
-  // urso: patada (pata dianteira avança no golpe)
-  if (esp === 'urso' && atk > 0) { const e = Math.sin(atk * Math.PI), sd = 1; const px = L * 0.35 + e * 9, py = sd * (W * 0.8 + e * 2);
-    g.beginPath(); g.moveTo(L * 0.25, sd * W * 0.4); g.lineTo(px, py); g.lineWidth = 5; g.strokeStyle = CONTORNO; g.stroke(); g.lineWidth = 3.4; g.strokeStyle = E.escuro; g.stroke();
-    circulo(g, px, py, 3); g.fillStyle = E.escuro; g.fill(); g.lineWidth = 1; g.strokeStyle = CONTORNO; g.stroke();
-    if (e > 0.6) { g.beginPath(); for (let k = -1; k <= 1; k++) { g.moveTo(px + 2, py + k * 1.6); g.lineTo(px + 6, py + k * 2.4); } g.lineWidth = 0.9; g.strokeStyle = 'rgba(255,255,255,.7)'; g.stroke(); } }
-}
-function desenharAnimal(a, dtR) {
-  const E = ESP_ANIMAL[a.esp], x = a.rx * T + T / 2, y = a.ry * T + T / 2 + 4;
-  if (Q.nivel === 0) a.yawVis = YAW_DIR[dirDeYaw(a.yawAlvo)]; else a.yawVis += difAng(a.yawAlvo, a.yawVis) * Math.min(1, dtR * 8);
-  const s = Math.sin(a.yawVis), co = Math.cos(a.yawVis), ang = Math.atan2(co * 0.62, s);
-  const w = clamp(a.rvel / 2, 0, 1.3), fase = ((a.rdist / E.passo) % 1 + 1) % 1, corre = a.rvel > 3;
-  const morte = a.morto ? clamp(a.t / 0.6, 0, 1) : 0, v = a.vis || {};
-  const bob = corre ? Math.abs(Math.sin(fase * TAU)) * -2 : 0;
-  ctx.save(); ctx.translate(x, y);
-  elipse(ctx, 0, 6, E.L * 0.55, E.W * 0.75); ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fill();
-  ctx.translate(0, bob);
-  ctx.rotate(ang + morte * 0.5); ctx.scale(1, 1 - morte * 0.25);
-  corpoAnimal(ctx, a.esp, { fase, w, corre, morte, t: tempoReal + a.id, pasta: a.estado === 'pastar' && !a.morto ? 1 : 0, atk: a.atk || 0, chifre: a.chifre, flash: v.golpe > 0 ? v.golpe * 2 : 0 });
-  ctx.restore();
-  if (a.cacar && !a.morto) { ctx.save(); ctx.translate(x, y - E.W - 12); circulo(ctx, 0, 0, 4.5); ctx.lineWidth = 1.4; ctx.strokeStyle = '#e04848'; ctx.stroke(); ctx.beginPath(); ctx.moveTo(-7, 0); ctx.lineTo(-2, 0); ctx.moveTo(2, 0); ctx.lineTo(7, 0); ctx.moveTo(0, -7); ctx.lineTo(0, -2); ctx.moveTo(0, 2); ctx.lineTo(0, 7); ctx.stroke(); ctx.restore(); }
-  if (!a.morto && a.hp < E.hp) { const bw = 16; ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(x - bw / 2, y - E.W - 6, bw, 2.6); ctx.fillStyle = '#c94a3a'; ctx.fillRect(x - bw / 2, y - E.W - 6, bw * Math.max(0, a.hp / E.hp), 2.6); }
-  if (!a.morto && a.alerta > 0.45 && a.estado !== 'atacar') { ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(0,0,0,.8)'; const tx = a.alerta >= 1 ? '!' : '?'; ctx.strokeText(tx, x, y - E.W - 9); ctx.fillStyle = a.alerta >= 1 ? '#ffd770' : '#ddd'; ctx.fillText(tx, x, y - E.W - 9); }
-}
 /* ---- itens novos ---- */
 const SPR_ITEM_V8 = {};
 function desenharItemV8(g, it, cx, cy) {
   const tp = it.tipo;
-  if (tp.startsWith('CARC_')) { const esp = tp.slice(5).toLowerCase(); g.save(); g.translate(cx, cy + 2); elipse(g, 0, 5, 12, 3.5); g.fillStyle = 'rgba(0,0,0,.25)'; g.fill(); g.rotate(-0.3); const k = esp === 'urso' ? 0.75 : 0.85; g.scale(k, k * 0.8); corpoAnimal(g, esp, { morte: 1, t: 0 }); g.restore(); return true; }
+  if (tp.startsWith('CARC_')) { const esp = tp.slice(5).toLowerCase(); g.save(); g.translate(cx, cy + 2); elipse(g, 0, 5, 12, 3.5); g.fillStyle = 'rgba(0,0,0,.25)'; g.fill(); const k = esp === 'urso' ? 0.55 : 0.75; g.scale(k, k * 0.8); corpoAnimal(g, esp, { morte: 1, t: 0 }); g.restore(); return true; }
   const sombra = (rx = 10) => { elipse(g, cx + 1, cy + 6, rx, 3); g.fillStyle = 'rgba(0,0,0,0.25)'; g.fill(); };
   if (tp === 'ESPADA') { sombra(11); desenharArma(g, { tipo: 'espada', x0: cx - 7, y0: cy + 5, x1: cx + 8, y1: cy - 6, d: { x: 15, y: -11 } }); return true; }
   if (tp === 'ARCO') { sombra(10); desenharArma(g, { tipo: 'arco', x0: cx + 2, y0: cy, x1: cx - 2, y1: cy, d: { x: 1, y: 0 }, l: { x: 0, y: 1 }, carregado: false }); return true; }
   if (tp === 'ESCUDO') { sombra(8); desenharEscudo(g, cx, cy, 7); return true; }
   if (tp === 'FLECHAS') { sombra(9); for (let k = -2; k <= 2; k++) { g.beginPath(); g.moveTo(cx - 8, cy + k * 1.6 + 2); g.lineTo(cx + 7, cy + k * 1.2 - 1); g.lineWidth = 1.8; g.strokeStyle = CONTORNO; g.stroke(); g.lineWidth = 0.9; g.strokeStyle = '#a8763f'; g.stroke(); circulo(g, cx + 7.5, cy + k * 1.2 - 1, 0.9); g.fillStyle = '#b9bdc2'; g.fill(); }
     g.beginPath(); g.moveTo(cx - 9, cy - 2); g.lineTo(cx - 5, cy + 0); g.lineTo(cx - 9, cy + 6); g.closePath(); g.fillStyle = '#e8e2d0'; g.fill(); g.lineWidth = 0.7; g.strokeStyle = CONTORNO; g.stroke(); return true; }
+  if (tp === 'BANDAGEM_BOA') { sombra(9); for (const [ox, oy] of it.qtd > 2 ? [[-4, 1], [4, 1]] : [[0, 0]]) { elipse(g, cx + ox, cy + oy, 4.6, 3.6); g.fillStyle = '#fbfaf4'; g.fill(); g.lineWidth = 1.2; g.strokeStyle = CONTORNO; g.stroke(); g.beginPath(); g.ellipse(cx + ox, cy + oy, 3.4, 2.6, 0, 0, TAU); g.lineWidth = 0.9; g.strokeStyle = '#6fae4a'; g.stroke(); elipse(g, cx + ox, cy + oy, 1.4, 1.1); g.fillStyle = '#cfc6b2'; g.fill(); }
+    g.fillStyle = '#2e8b3a'; g.fillRect(cx + 5, cy - 7, 4.5, 1.6); g.fillRect(cx + 6.45, cy - 8.45, 1.6, 4.5); return true; }
   if (tp === 'BANDAGEM') { sombra(9); for (const [ox, oy] of it.qtd > 3 ? [[-4, 1], [4, 1], [0, -3]] : [[0, 0]]) { elipse(g, cx + ox, cy + oy, 4.6, 3.6); g.fillStyle = '#f4f1e8'; g.fill(); g.lineWidth = 1.2; g.strokeStyle = CONTORNO; g.stroke(); elipse(g, cx + ox, cy + oy, 1.6, 1.3); g.fillStyle = '#cfc6b2'; g.fill(); }
     g.fillStyle = '#c62828'; g.fillRect(cx + 5, cy - 7, 4.5, 1.6); g.fillRect(cx + 6.45, cy - 8.45, 1.6, 4.5); return true; }
   if (tp === 'CARNE') { sombra(10); for (const [ox, oy, r] of [[-4, 1, 4.4], [3.5, 2, 4], [0, -2.5, 3.8]]) { g.beginPath(); poligonoIrregular(g, cx + ox, cy + oy, r, 7, mulberry32(it.x * 7 + ox * 13 + 1), 0.3); g.fillStyle = '#b8443a'; g.fill(); g.lineWidth = 1.1; g.strokeStyle = CONTORNO; g.stroke(); elipse(g, cx + ox - 1, cy + oy - 1, r * 0.4, r * 0.25); g.fillStyle = '#f2d6c8'; g.fill(); } return true; }
@@ -4871,8 +4669,10 @@ function desenharManchas(g) {
     if (m.r > 3 && Q.nivel > 0) { elipse(g, m.x - m.r * 0.2, m.y - m.r * 0.15, m.r * 0.4, m.r * 0.22, m.rot); g.fillStyle = '#9a1818'; g.fill(); }
   }
   g.globalAlpha = 1;
+  desenharCadaveres(g);
 }
 function desenharCombate(g) {
+  desenharOverlaySaude(g);
   const vel = estado.pausado ? 0 : estado.velocidade;
   for (const f of flechasChao) { g.globalAlpha = 1 - clamp((f.t - 18) / 7, 0, 1); const x = (f.x + 0.5) * T, y = (f.y + 0.5) * T + 4;
     g.beginPath(); g.moveTo(x, y); g.lineTo(x - Math.cos(f.ang) * 7, y - Math.sin(f.ang) * 7 * 0.6 - 3); g.lineWidth = 1.2; g.strokeStyle = '#6a4a2a'; g.stroke(); circulo(g, x - Math.cos(f.ang) * 7, y - Math.sin(f.ang) * 4.2 - 3, 1); g.fillStyle = '#e8e2d0'; g.fill(); }
@@ -4907,74 +4707,6 @@ function desenharCombate(g) {
 }
 function faiscasEscudo(c, a) { const x = (c.x + 0.5) * T + (a.x - c.x) * 6, y = (c.y + 0.5) * T + (a.y - c.y) * 4; for (let k = 0; k < (Q.nivel ? 5 : 2); k++) particula('lasca', x, y, 10, rv(-40, 40), rv(-30, 30), rv(30, 70), 0.6, { cor: '#c99a5b' }); }
 /* ------------------------------ UI v8 ------------------------------ */
-let abaInspecao = 'geral', camadaSaude = 'pele', parteSel = null;
-const CAMADAS = [['esqueleto', 'Esqueleto'], ['musculos', 'Músculos'], ['pele', 'Pele'], ['roupa', 'Roupa']];
-const FORMA_PARTE = {
-  cabeca: 'M50 6 C62 6 64 16 64 21 C64 30 58 36 50 36 C42 36 36 30 36 21 C36 16 38 6 50 6Z', pescoco: 'M44 35 H56 V43 H44Z',
-  torso: 'M33 43 H67 Q71 45 70 52 L68 96 Q50 101 32 96 L30 52 Q29 45 33 43Z',
-  bracoD: 'M30 46 Q22 46 20 54 L16 88 Q17 92 22 92 L27 89 L30 58Z', bracoE: 'M70 46 Q78 46 80 54 L84 88 Q83 92 78 92 L73 89 L70 58Z',
-  maoD: 'M13 93 Q13 88 19 89 Q26 90 25 96 Q24 104 18 103 Q12 101 13 93Z', maoE: 'M87 93 Q87 88 81 89 Q74 90 75 96 Q76 104 82 103 Q88 101 87 93Z',
-  pernaD: 'M33 96 Q41 100 49 98 L47 164 Q41 167 36 164Z', pernaE: 'M67 96 Q59 100 51 98 L53 164 Q59 167 64 164Z',
-  peD: 'M35 164 H48 Q49 172 44 175 Q33 177 30 172 Q31 166 35 164Z', peE: 'M65 164 H52 Q51 172 56 175 Q67 177 70 172 Q69 166 65 164Z',
-};
-const OSSOS = { // desenho do esqueleto por parte (só decoração)
-  cabeca: '<ellipse cx="50" cy="19" rx="10" ry="11"/><path d="M43 29 Q50 35 57 29"/><circle cx="46" cy="19" r="2.4" fill="#1d2024"/><circle cx="54" cy="19" r="2.4" fill="#1d2024"/>',
-  pescoco: '<path d="M50 35 V44"/>', torso: '<path d="M50 44 V92"/><path d="M50 50 Q38 50 37 56 M50 50 Q62 50 63 56 M50 57 Q38 57 37 63 M50 57 Q62 57 63 63 M50 64 Q39 64 38 70 M50 64 Q61 64 62 70"/><path d="M38 88 Q50 98 62 88 Q58 84 50 86 Q42 84 38 88Z"/>',
-  bracoD: '<path d="M27 50 L23 70 L20 88"/>', bracoE: '<path d="M73 50 L77 70 L80 88"/>', maoD: '<path d="M18 92 L16 100 M20 92 L20 101 M22 92 L23 100"/>', maoE: '<path d="M82 92 L84 100 M80 92 L80 101 M78 92 L77 100"/>',
-  pernaD: '<path d="M43 98 L42 130 L41 162"/><circle cx="42" cy="130" r="2"/>', pernaE: '<path d="M57 98 L58 130 L59 162"/><circle cx="58" cy="130" r="2"/>',
-  peD: '<path d="M41 165 L35 172 M42 166 L40 174 M43 166 L45 173"/>', peE: '<path d="M59 165 L65 172 M58 166 L60 174 M57 166 L55 173"/>',
-};
-const CENTRO_PARTE = { cabeca: [50, 21], pescoco: [50, 39], torso: [50, 70], bracoD: [23, 70], bracoE: [77, 70], maoD: [19, 96], maoE: [81, 96], pernaD: [42, 130], pernaE: [58, 130], peD: [40, 170], peE: [60, 170] };
-function svgCorpo(c) {
-  const s = saude(c), L = camadaSaude, por = {};
-  for (const f of s.feridas) (por[f.parte] = por[f.parte] || []).push(f);
-  let h = `<svg viewBox="0 0 100 180" width="98" height="176" style="flex:none;background:${L === 'esqueleto' ? '#14171a' : 'rgba(0,0,0,.25)'};border-radius:6px;touch-action:none">`;
-  for (const p in FORMA_PARTE) {
-    const roupa = L === 'roupa', g = PARTES[p].g;
-    let fill = L === 'esqueleto' ? '#1d2024' : L === 'musculos' ? (g === 'cabeca' ? '#b85a50' : '#a8443c') : c.pele;
-    if (roupa) fill = (g === 'torso' || g === 'braco') ? c.roupa : g === 'perna' ? '#4a3d33' : g === 'pe' ? '#3b2d22' : c.pele;
-    const fs = por[p] || [], pior = fs.reduce((m, f) => Math.max(m, f.sev), 0);
-    const borda = p === parteSel ? '#ffffff' : pior ? (pior > 0.55 ? '#ff4a3a' : pior > 0.3 ? '#ff9a3a' : '#ffd23a') : (L === 'esqueleto' ? '#444' : '#17140f');
-    h += `<path d="${FORMA_PARTE[p]}" data-parte="${p}" fill="${fill}" stroke="${borda}" stroke-width="${pior || p === parteSel ? 2.2 : 1.2}"${p === parteSel ? ' stroke-dasharray="3 2"' : ''} style="cursor:pointer"/>`;
-  }
-  if (L === 'esqueleto') h += `<g fill="none" stroke="#e8e2d0" stroke-width="2" stroke-linecap="round" pointer-events="none">${Object.values(OSSOS).join('')}</g>`;
-  if (L === 'musculos') h += `<g pointer-events="none" stroke="rgba(255,205,190,.35)" stroke-width="0.8" fill="none"><path d="M36 52 Q50 60 64 52 M36 62 Q50 68 64 62 M40 74 H60 M40 82 H60 M50 44 V96 M22 56 L20 84 M78 56 L80 84 M41 104 L42 158 M59 104 L58 158"/></g>
-    <g pointer-events="none"><ellipse cx="42" cy="58" rx="6" ry="9" fill="#d98a8a" opacity=".8"/><ellipse cx="58" cy="58" rx="6" ry="9" fill="#d98a8a" opacity=".8"/><path d="M50 61 C46 56 41 61 50 68 C59 61 54 56 50 61Z" fill="#7a1010"/><text x="50" y="92" font-size="5" text-anchor="middle" fill="#fbe">órgãos</text></g>`;
-  if (L === 'roupa') h += `<path d="M37 9 Q50 0 63 9 Q60 13 50 12 Q40 13 37 9Z" fill="${c.cabelo}" pointer-events="none"/>`;
-  // marcas de ferimento
-  for (const p in por) {
-    const [cx, cy] = CENTRO_PARTE[p];
-    for (const [k, f] of por[p].entries()) {
-      const ox = cx + (k - (por[p].length - 1) / 2) * 7;
-      if (f.tipo === 'fratura' && (L === 'esqueleto' || !f.tala)) h += `<path d="M${ox - 4} ${cy - 3} L${ox - 1} ${cy + 1} L${ox + 1} ${cy - 2} L${ox + 4} ${cy + 3}" stroke="#ff4a3a" stroke-width="1.8" fill="none" pointer-events="none"/>`;
-      else if (f.sangra > 0) h += `<path d="M${ox} ${cy - 5} Q${ox + 3.5} ${cy} ${ox} ${cy + 2.5} Q${ox - 3.5} ${cy} ${ox} ${cy - 5}Z" fill="#c01818" stroke="#300" stroke-width=".6" pointer-events="none"/>`;
-      else if (corta(f.tipo)) h += `<path d="M${ox - 4} ${cy - 2} L${ox + 4} ${cy + 2}" stroke="#a01818" stroke-width="1.6" pointer-events="none"/>`;
-      else h += `<circle cx="${ox}" cy="${cy}" r="${2 + f.sev * 3}" fill="rgba(110,60,150,.55)" pointer-events="none"/>`;
-      if (f.band || f.tala) h += `<rect x="${ox - 5}" y="${cy + 3}" width="10" height="2.6" rx="1" fill="${f.tala ? '#b07d4b' : '#f4f1e8'}" stroke="#222" stroke-width=".5" pointer-events="none"/>`;
-      if (f.infec > 0) h += `<circle cx="${ox}" cy="${cy}" r="6" fill="rgba(120,180,40,${(0.2 + f.infec * 0.5).toFixed(2)})" pointer-events="none"/>`;
-    }
-  }
-  return h + '</svg>';
-}
-const tabsInspecao = () => `<div style="display:flex;gap:4px;margin:-2px 0 4px">${[['geral', 'Geral'], ['saude', 'Saúde']].map(([k, n]) => `<span class="ordem${abaInspecao === k ? ' sel' : ''}" data-insp="${k}" style="padding:2px 9px;margin:0">${n}</span>`).join('')}</div>`;
-function textoFerida(f) {
-  const tr = f.tala ? 'tala' + (f.band ? ' + bandagem' : '') : f.band ? 'bandagem' : f.trat ? 'tratada sem bandagem' : '';
-  return `<b>${FERIDA[f.tipo].nome}</b> ${Math.round(f.sev * 100)}%` + (f.sangra > 0 ? ` · <span class="neg">sangramento ${nivelSangra(f)}</span>` : '') +
-    (f.infec > 0 ? ` · <span style="color:#a8d060">infecção ${Math.round(f.infec * 100)}%${f.infTrat ? ' (tratada)' : ''}</span>` : '') +
-    ` · ${tr ? `<span class="pos">${tr}</span>` : '<span class="neg">não tratada</span>'}`;
-}
-function htmlSaude(c) {
-  const s = saude(c), est = s.caido ? (s.inconsciente ? 'Inconsciente' : 'Caído(a)') : c.tarefa && c.tarefa.tipo === 'repousar' ? (c.tarefa.camaReal ? 'Repousando na cama médica' : 'Repousando') : s.feridas.length ? 'Ferido(a), de pé' : 'Saudável';
-  const lista = s.feridas.filter(f => !parteSel || f.parte === parteSel);
-  const bar = (rot, v, inv) => barraNec(rot, inv ? 100 - v : v).replace(/<i>\d+%<\/i>/, `<i>${Math.round(v)}%</i>`);
-  return tabsInspecao() + `<h3>${c.nome} <span style="font-size:12px;color:${s.caido ? '#ff8a7a' : '#bbb'}">— ${est}</span></h3>` +
-    bar('Sangue', s.sangue) + bar('Dor', s.dor * 100, true) + bar('Movimento', fatorMov(c) * 100) + bar('Trabalho', fatorTrab(c) * 100) +
-    `<div style="margin:5px 0 4px">${CAMADAS.map(([k, n]) => `<span class="ordem${camadaSaude === k ? ' sel' : ''}" data-camada="${k}" style="padding:2px 6px;margin:1px">${n}</span>`).join('')}</div>` +
-    `<div style="display:flex;gap:8px;align-items:flex-start">${svgCorpo(c)}<div style="flex:1;min-width:0;font-size:12px">` +
-    `<div class="sub" style="margin:0 0 3px">${parteSel ? PARTES[parteSel].nome + ' <span data-parte="" style="cursor:pointer;color:#9cf">(todas)</span>' : 'Toque numa parte do corpo'}</div>` +
-    (lista.length ? lista.map(f => `<div style="margin:2px 0">${parteSel ? '' : PARTES[f.parte].nome + ': '}${textoFerida(f)}</div>`).join('') : `<div style="color:#888">${parteSel ? 'Nada nesta parte.' : 'Nenhum ferimento.'}</div>`) +
-    `<div class="sub" style="margin-top:6px">Bandagens com ${c.nome}: ${c.bandagens || 0}${s.examinado ? ' · examinado(a)' : ''}</div></div></div>`;
-}
 function textoEquip(c) {
   const l = []; if (c.arma) l.push(ARMAS[c.arma].nome); if (c.escudo) l.push('Escudo'); if (c.arma === 'arco') l.push(`${c.flechas || 0} flechas`); if (c.bandagens) l.push(`${c.bandagens} bandagem(ns)`);
   return l.join(', ') || 'nenhum';
@@ -4983,7 +4715,7 @@ function animalEmTela(cx, cy) { const m = telaParaMundo(cx, cy); let mel = null,
 function htmlAnimal(a) {
   const E = ESP_ANIMAL[a.esp], est = { pastar: 'pastando', vagar: 'andando', fugir: 'fugindo', atacar: 'atacando ' + (a.alvo ? a.alvo.nome : ''), partir: 'indo embora', morto: 'morto' }[a.estado] || a.estado;
   const bando = a.bando ? animais.filter(o => o.bando === a.bando && !o.morto).length : 1;
-  return `<h3>${E.nome}${a.chifre ? ' (macho)' : ''}</h3><div class="sub">${est}${bando > 1 ? ` · bando de ${bando}` : ''} · vida ${Math.max(0, Math.round(a.hp))}/${E.hp} · alerta ${Math.round(Math.min(1, a.alerta) * 100)}%</div>` +
+  return `<h3>${E.nome}${a.chifre ? ' (macho)' : ''}</h3><div class="sub">${a.saude && a.saude.caido && !a.morto ? '<b style="color:#ff8a7a">caído</b> · ' : ''}${est}${bando > 1 ? ` · bando de ${bando}` : ''} · vida ${Math.max(0, Math.round(a.hp))}/${E.hp} · alerta ${Math.round(Math.min(1, a.alerta) * 100)}%</div>` + htmlSaudeAnimal(a) +
     `<div class="sub">${a.esp === 'veado' ? 'Foge quando percebe alguém. Cansa depois de algumas fugas.' : a.esp === 'lobo' ? 'Caça em matilha, principalmente à noite.' : 'Territorial: ataca quem chega perto.'} Vento: ${SETA_VENTO(estado.vento || 0)} (aproxime-se a favor do vento e agachado).</div>` +
     (a.morto ? '' : `<span class="ordem${a.cacar ? ' sel' : ''}" data-ani="cacar">🎯 ${a.cacar ? 'Cancelar caça' : 'Caçar'} (J)</span><span class="ordem" data-ani="grupo">👥 Caçada em grupo…</span>`);
 }
@@ -5015,8 +4747,10 @@ function instalarUIv8() {
       else { const c = colonos.find(o => o.nome === k); if (c && !saude(c).caido) { if (cacadaPainel.sel.has(c)) cacadaPainel.sel.delete(c); else if (cacadaPainel.sel.size < 4) cacadaPainel.sel.add(c); } }
       desenharPainelCacada(); }); }
   $('inspecionar').addEventListener('pointerdown', e => {
-    const t = e.target.closest('[data-insp],[data-camada],[data-parte],[data-ani]'); if (!t) return; e.preventDefault();
-    if (t.dataset.insp) abaInspecao = t.dataset.insp;
+    const t = e.target.closest('[data-insp],[data-camada],[data-parte],[data-ani],[data-roupa],[data-anat]'); if (!t) return; e.preventDefault();
+    if (t.dataset.roupa) verRoupa = !verRoupa;
+    else if (t.dataset.anat && inspecao && inspecao.colono) abrirAnatomia(inspecao.colono);
+    else if (t.dataset.insp) abaInspecao = t.dataset.insp;
     else if (t.dataset.camada) camadaSaude = t.dataset.camada;
     else if (t.dataset.parte !== undefined) parteSel = t.dataset.parte && t.dataset.parte !== parteSel ? t.dataset.parte : null;
     else if (t.dataset.ani && inspecao && inspecao.animal) { const a = inspecao.animal; if (t.dataset.ani === 'cacar') { a.cacar = !a.cacar; log(a.cacar ? `${a.nome} marcado(a) para caça.` : 'Caça cancelada.'); } else abrirPainelCacada(a); }
@@ -5027,12 +4761,12 @@ function instalarUIv8() {
 }
 /* ------------------------------ SAVE v8 ------------------------------ */
 function serializarV8() {
-  return animais.filter(a => !a.morto).map(a => ({ esp: a.esp, x: Math.round(a.x), y: Math.round(a.y), hp: a.hp, bando: a.bando, casa: a.casa, cacar: !!a.cacar, caca: !!a.caca, ate: a.ate || 0, chifre: !!a.chifre, stamina: a.stamina }));
+  return animais.filter(a => !a.morto).map(a => ({ esp: a.esp, x: Math.round(a.x), y: Math.round(a.y), hp: a.hp, saude: a.saude, bando: a.bando, casa: a.casa, cacar: !!a.cacar, caca: !!a.caca, ate: a.ate || 0, chifre: !!a.chifre, stamina: a.stamina }));
 }
 function aplicarSaveV8(d) {
   const rs = rndSim.s;
   animais.length = projeteis.length = cacadas.length = flechasChao.length = manchas.length = 0;
-  if (Array.isArray(d.animais)) { for (const s of d.animais) if (ESP_ANIMAL[s.esp]) { const a = criarAnimal(s.esp, s.x, s.y, { hp: s.hp, bando: s.bando, casa: s.casa || { x: s.x, y: s.y }, cacar: s.cacar, caca: s.caca, ate: s.ate || 0, chifre: s.chifre, stamina: s.stamina ?? 1 }); idBando = Math.max(idBando, s.bando || 0); } }
+  if (Array.isArray(d.animais)) { for (const s of d.animais) if (ESP_ANIMAL[s.esp]) { const a = criarAnimal(s.esp, s.x, s.y, { hp: s.hp, ...(s.saude ? { saude: s.saude } : {}), bando: s.bando, casa: s.casa || { x: s.x, y: s.y }, cacar: s.cacar, caca: s.caca, ate: s.ate || 0, chifre: s.chifre, stamina: s.stamina ?? 1 }); idBando = Math.max(idBando, s.bando || 0); } }
   else povoarAnimais(); // save antigo (v6/v7): coloca a fauna inicial
   for (const c of colonos) { saude(c); c.arma = c.arma || null; c.escudo = !!c.escudo; c.flechas = c.flechas || 0; c.bandagens = c.bandagens || 0; c.carregadoPor = c.resgatador = c.medico = null; c.anim = null; c.pedeAjuda = false; c.agachado = false; c.sentado = false;
     if (c.saude.caido) c.anim = null; }
@@ -5040,7 +4774,7 @@ function aplicarSaveV8(d) {
   rndSim.s = rs;
 }
 function fatorMovTotal(c) {
-  const t = c.tarefa; let k = fatorMov(c) * (c.agachado ? 0.45 : 1);
+  const t = c.tarefa; let k = fatorMov(c) * (c.agachado ? 0.45 : 1) * freioChegada(c);
   if (t && t.tipo === 'resgatar' && t.fase === 'levando') k *= ESTILO_CARGA[t.estilo].vel;
   if (t && t.tipo === 'fugir') k *= 1.12;
   return k;
@@ -5059,6 +4793,1111 @@ function ordemCaca(a, b) {
 }
 instalarUIv8();
 window.V8 = { ferir, criarAnimal, grupoAnimais, ataqueForcado, dispararEventoV8, iniciarCacada, encerrarCacada, animais, cacadas, projeteis, saude, seres, povoarAnimais, estiloResgate, POSES };
+
+/* =========================== SAÚDE v10 (anatomia completa) =========================== */
+/* =====================================================================
+   v10 — SAÚDE COMPLETA (estilo RimWorld)
+   Anatomia por espécie com hierarquia; cada parte tem HP, cobertura, profundidade,
+   flag vital e contribuição para capacidades. Perder uma parte remove as filhas.
+   Morte existe (cadáver, pensamento dos outros; o modo dev ressuscita).
+   ===================================================================== */
+const ANAT = {};
+function montarAnatomia(nome, lista, k = 1) {
+  const partes = {}, ordem = [];
+  for (const [id, nomeP, pai, hp, cob, prof, ex] of lista) { partes[id] = Object.assign({ id, nome: nomeP, pai, hp: Math.max(4, Math.round(hp * k)), cob, prof, filhos: [] }, ex || {}); ordem.push(id); }
+  for (const id of ordem) { const p = partes[id]; if (p.pai) partes[p.pai].filhos.push(id); }
+  for (const id of ordem) { const p = partes[id]; p.abs = p.pai ? partes[p.pai].abs * p.cob : 1; p.nivel = p.pai ? partes[p.pai].nivel + 1 : 0; }
+  for (const id of ordem) { const p = partes[id]; const fora = p.filhos.map(f => partes[f]).filter(f => f.prof === 'fora');
+    p.exc = p.prof === 'fora' ? p.abs * Math.max(0, 1 - fora.reduce((s, f) => s + f.cob, 0)) : 0; }
+  ANAT[nome] = { partes, ordem, raiz: ordem[0] };
+  return ANAT[nome];
+}
+// humano ---------------------------------------------------------------------------------
+(() => {
+  const L = [];
+  const P = (id, nome, pai, hp, cob, prof, ex) => L.push([id, nome, pai, hp, cob, prof, ex]);
+  P('torso', 'Torso', null, 40, 1, 'fora', { g: 'torso', vital: true, ancora: 'torso' });
+  P('pescoco', 'Pescoço', 'torso', 25, 0.075, 'fora', { g: 'cabeca', ancora: 'pescoco', vital: true });
+  P('cabeca', 'Cabeça', 'pescoco', 25, 0.8, 'fora', { g: 'cabeca', ancora: 'cabeca', vital: true, temOsso: true });
+  P('cranio', 'Crânio', 'cabeca', 25, 0.25, 'dentro', { g: 'cabeca', ancora: 'cabeca', osso: true });
+  P('cerebro', 'Cérebro', 'cranio', 10, 0.8, 'dentro', { g: 'cabeca', ancora: 'cabeca', vital: true, cap: 'consciencia' });
+  for (const [sd, s, ln] of [['D', 1, 'direito'], ['E', -1, 'esquerdo']]) {
+    P('olho' + sd, 'Olho ' + ln, 'cabeca', 10, 0.07, 'fora', { g: 'cabeca', ancora: 'cabeca', lado: s, cap: 'visao', pequeno: true });
+    P('orelha' + sd, 'Orelha ' + (sd === 'D' ? 'direita' : 'esquerda'), 'cabeca', 12, 0.07, 'fora', { g: 'cabeca', ancora: 'cabeca', lado: s, cap: 'audicao', pequeno: true });
+  }
+  P('nariz', 'Nariz', 'cabeca', 10, 0.1, 'fora', { g: 'cabeca', ancora: 'cabeca', pequeno: true });
+  P('mandibula', 'Mandíbula', 'cabeca', 20, 0.15, 'fora', { g: 'cabeca', ancora: 'cabeca', temOsso: true, cap: 'fala' });
+  P('coracao', 'Coração', 'torso', 15, 0.03, 'dentro', { g: 'torso', ancora: 'torso', vital: true, cap: 'bombeamento' });
+  P('pulmaoD', 'Pulmão direito', 'torso', 15, 0.05, 'dentro', { g: 'torso', ancora: 'torso', lado: 1, cap: 'respiracao' });
+  P('pulmaoE', 'Pulmão esquerdo', 'torso', 15, 0.05, 'dentro', { g: 'torso', ancora: 'torso', lado: -1, cap: 'respiracao' });
+  P('figado', 'Fígado', 'torso', 20, 0.04, 'dentro', { g: 'torso', ancora: 'torso', vital: true, cap: 'filtragem' });
+  P('estomago', 'Estômago', 'torso', 20, 0.04, 'dentro', { g: 'torso', ancora: 'torso', cap: 'digestao' });
+  P('intestinos', 'Intestinos', 'torso', 20, 0.06, 'dentro', { g: 'torso', ancora: 'torso', cap: 'digestao' });
+  P('rimD', 'Rim direito', 'torso', 15, 0.02, 'dentro', { g: 'torso', ancora: 'torso', lado: 1, cap: 'filtragem' });
+  P('rimE', 'Rim esquerdo', 'torso', 15, 0.02, 'dentro', { g: 'torso', ancora: 'torso', lado: -1, cap: 'filtragem' });
+  P('costelas', 'Costelas', 'torso', 30, 0.1, 'dentro', { g: 'torso', ancora: 'torso', osso: true });
+  P('coluna', 'Coluna', 'torso', 25, 0.05, 'dentro', { g: 'torso', ancora: 'torso', osso: true, cap: 'movimento' });
+  P('claviculaD', 'Clavícula direita', 'torso', 25, 0.03, 'dentro', { g: 'torso', ancora: 'torso', lado: 1, osso: true });
+  P('claviculaE', 'Clavícula esquerda', 'torso', 25, 0.03, 'dentro', { g: 'torso', ancora: 'torso', lado: -1, osso: true });
+  const DEDOS = ['Polegar', 'Indicador', 'Dedo médio', 'Anelar', 'Mínimo'], ARTELHOS = ['Dedão do pé', '2º dedo do pé', '3º dedo do pé', '4º dedo do pé', 'Dedinho do pé'];
+  for (const [sd, s, ln, la] of [['D', 1, 'direito', 'direita'], ['E', -1, 'esquerdo', 'esquerda']]) {
+    P('ombro' + sd, 'Ombro ' + ln, 'torso', 30, 0.12, 'fora', { g: 'braco', ancora: 'braco' + sd, lado: s, temOsso: true });
+    P('braco' + sd, 'Braço ' + ln, 'ombro' + sd, 30, 0.77, 'fora', { g: 'braco', ancora: 'braco' + sd, lado: s, temOsso: true });
+    P('mao' + sd, 'Mão ' + la, 'braco' + sd, 20, 0.14, 'fora', { g: 'mao', ancora: 'mao' + sd, lado: s, temOsso: true, cap: 'manipulacao' });
+    DEDOS.forEach((n, k) => P(`dedo${k + 1}${sd}`, `${n} ${ln}`, 'mao' + sd, 8, 0.08, 'fora', { g: 'mao', ancora: 'mao' + sd, lado: s, pequeno: true, temOsso: true, dedo: k }));
+  }
+  P('quadril', 'Quadril (pelve)', 'torso', 25, 0.25, 'fora', { g: 'torso', ancora: 'torso', osso: true, cap: 'movimento' });
+  for (const [sd, s, ln, la] of [['D', 1, 'direito', 'direita'], ['E', -1, 'esquerdo', 'esquerda']]) {
+    P('perna' + sd, 'Perna ' + la, 'quadril', 30, 0.4, 'fora', { g: 'perna', ancora: 'perna' + sd, lado: s, temOsso: true, cap: 'movimento' });
+    P('pe' + sd, 'Pé ' + ln, 'perna' + sd, 25, 0.12, 'fora', { g: 'pe', ancora: 'pe' + sd, lado: s, temOsso: true });
+    ARTELHOS.forEach((n, k) => P(`artelho${k + 1}${sd}`, `${n} ${ln}`, 'pe' + sd, 8, 0.06, 'fora', { g: 'pe', ancora: 'pe' + sd, lado: s, pequeno: true, temOsso: true, dedo: k }));
+  }
+  montarAnatomia('humano', L);
+})();
+// animais (mesmo sistema; escala de HP por espécie) ------------------------------------------
+function anatomiaAnimal(esp, k) {
+  const L = [], P = (id, nome, pai, hp, cob, prof, ex) => L.push([id, nome, pai, hp, cob, prof, ex]);
+  P('corpo', 'Corpo', null, 40, 1, 'fora', { g: 'torso', vital: true });
+  P('pescoco', 'Pescoço', 'corpo', 25, 0.1, 'fora', { g: 'cabeca', vital: true });
+  P('cabeca', 'Cabeça', 'pescoco', 25, 0.75, 'fora', { g: 'cabeca', vital: true });
+  P('cranio', 'Crânio', 'cabeca', 25, 0.3, 'dentro', { g: 'cabeca', osso: true });
+  P('cerebro', 'Cérebro', 'cranio', 10, 0.8, 'dentro', { g: 'cabeca', vital: true, cap: 'consciencia' });
+  P('olhoD', 'Olho direito', 'cabeca', 10, 0.08, 'fora', { g: 'cabeca', cap: 'visao', pequeno: true }); P('olhoE', 'Olho esquerdo', 'cabeca', 10, 0.08, 'fora', { g: 'cabeca', cap: 'visao', pequeno: true });
+  P('focinho', 'Focinho', 'cabeca', 15, 0.18, 'fora', { g: 'cabeca', pequeno: true });
+  P('coracao', 'Coração', 'corpo', 15, 0.03, 'dentro', { g: 'torso', vital: true, cap: 'bombeamento' });
+  P('pulmaoD', 'Pulmão direito', 'corpo', 15, 0.05, 'dentro', { g: 'torso', cap: 'respiracao' }); P('pulmaoE', 'Pulmão esquerdo', 'corpo', 15, 0.05, 'dentro', { g: 'torso', cap: 'respiracao' });
+  P('figado', 'Fígado', 'corpo', 20, 0.05, 'dentro', { g: 'torso', vital: true, cap: 'filtragem' });
+  P('estomago', 'Estômago', 'corpo', 20, 0.05, 'dentro', { g: 'torso', cap: 'digestao' });
+  P('coluna', 'Coluna', 'corpo', 25, 0.05, 'dentro', { g: 'torso', osso: true, cap: 'movimento' });
+  for (const [id, nome, perna] of [['pernaDE', 'Pata dianteira esquerda', 0], ['pernaDD', 'Pata dianteira direita', 1], ['pernaTE', 'Pata traseira esquerda', 2], ['pernaTD', 'Pata traseira direita', 3]]) {
+    P(id, nome, 'corpo', 25, 0.085, 'fora', { g: 'perna', perna, temOsso: true, cap: 'movimento' });
+    P('casco' + id.slice(5), (esp === 'veado' ? 'Casco ' : 'Pata ') + nome.slice(5).replace('dianteira', 'dianteiro').replace('traseira', 'traseiro'), id, 15, 0.2, 'fora', { g: 'pe', perna, pequeno: true });
+  }
+  P('cauda', 'Cauda', 'corpo', 10, 0.05, 'fora', { g: 'torso', pequeno: true });
+  return montarAnatomia(esp, L, k);
+}
+anatomiaAnimal('veado', 0.85); anatomiaAnimal('lobo', 0.9); anatomiaAnimal('urso', 2.3);
+const PARTES = ANAT.humano.partes;
+// tipos de dano / ferida -------------------------------------------------------------------
+const FERIDA = {
+  corte: { nome: 'Corte', dor: 0.0125, sangra: 0.22, infec: 0.22 }, mordida: { nome: 'Mordida', dor: 0.0135, sangra: 0.18, infec: 0.3 },
+  arranhao: { nome: 'Arranhão', dor: 0.011, sangra: 0.15, infec: 0.18 }, contusao: { nome: 'Contusão', dor: 0.017, sangra: 0, infec: 0 },
+  queimadura: { nome: 'Queimadura', dor: 0.019, sangra: 0, infec: 0.5 }, fratura: { nome: 'Fratura', dor: 0.02, sangra: 0, infec: 0 },
+  trinca: { nome: 'Trinca no osso', dor: 0.012, sangra: 0, infec: 0 }, perfuracao: { nome: 'Perfuração', dor: 0.013, sangra: 0.24, infec: 0.25 },
+  perda: { nome: 'Perdido', dor: 0.012, sangra: 0.2, infec: 0.3 }, cicatriz: { nome: 'Cicatriz', dor: 0.002, sangra: 0, infec: 0 },
+};
+const SANGRA = { leve: 2, medio: 5, forte: 9 }; // pontos de sangue por hora (atalhos do modo dev)
+const novaSaude = () => ({ feridas: [], perdidas: [], sangue: 100, dor: 0, caido: false, inconsciente: false, prox: 0, cap: null, v10: 1 });
+function saude(c) { if (!c.saude) c.saude = novaSaude(); if (!c.saude.v10) migrarSaude(c); return c.saude; }
+const anatDe = c => ANAT[c.animal ? c.esp : 'humano'];
+const nivelSangra = f => f.sangra <= 0 ? '' : f.sangra >= 7 ? 'forte' : f.sangra >= 3.5 ? 'médio' : 'leve';
+const corta = tipo => tipo === 'corte' || tipo === 'mordida' || tipo === 'arranhao' || tipo === 'perfuracao';
+const permanente = f => f.tipo === 'perda' || f.tipo === 'cicatriz';
+function visDe(c) { if (!c.vis) c.vis = { careta: 0, golpe: 0, bloqueio: 0, gota: 0 }; return c.vis; }
+const st10 = (k, n = 1) => { estado.stats[k] = (estado.stats[k] || 0) + n; };
+function migrarSaude(c) { // saves v8/v9: feridas guardavam só gravidade (0..1); agora são pontos de dano
+  const s = c.saude, A = anatDe(c);
+  s.perdidas = s.perdidas || []; s.v10 = 1; s.cap = null;
+  for (const f of s.feridas) { const P = A.partes[f.parte] || A.partes[A.raiz]; f.parte = P.id; if (!FERIDA[f.tipo]) f.tipo = 'contusao'; f.dano = f.dano ?? Math.max(1, (f.sev || 0.2) * P.hp * 0.9); f.dano0 = f.dano0 ?? f.dano; if (f.trat && f.trat < 0.3) f.trat = 0.35; f.infRolou = f.infRolou ?? (f.idade > 180); f.imune = f.imune || 0; if (f.infec > 0) f.imune = Math.min(0.5, f.imune * 20); atualizarSev(c, f); }
+}
+const hpMax = (c, id) => anatDe(c).partes[id].hp;
+const faltando = (c, id) => saude(c).perdidas.includes(id);
+function danoEm(c, id) { let d = 0; for (const f of saude(c).feridas) if (f.parte === id && f.tipo !== 'perda') d += f.dano; return d; }
+function hpAtual(c, id) { return faltando(c, id) ? 0 : Math.max(0, hpMax(c, id) - danoEm(c, id)); }
+function atualizarSev(c, f) { const P = anatDe(c).partes[f.parte]; f.sev = f.tipo === 'perda' ? 1 : clamp(f.dano / P.hp, 0.02, 1); }
+// eficiência de uma parte (0..1): HP, fratura sem tala; membros multiplicam pela cadeia de pais
+function eficiencia(c, id, cadeia = true) {
+  const A = anatDe(c), P = A.partes[id]; if (!P || faltando(c, id)) return 0;
+  let e = hpAtual(c, id) / P.hp;
+  for (const f of saude(c).feridas) if (f.parte === id) { if (f.tipo === 'fratura') e *= f.tala ? 0.72 : 0.35; else if (f.tipo === 'trinca') e *= 0.8; }
+  if (cadeia && P.pai && (P.g === 'braco' || P.g === 'mao' || P.g === 'perna' || P.g === 'pe') && A.partes[P.pai].g !== 'torso') e *= eficiencia(c, P.pai, true);
+  else if (cadeia && P.pai === 'quadril') e *= Math.max(0.4, eficiencia(c, 'quadril', false));
+  return clamp(e, 0, 1);
+}
+const media = l => l.length ? l.reduce((a, b) => a + b, 0) / l.length : 0;
+const CAPS = [['consciencia', 'Consciência'], ['movimento', 'Movimento'], ['manipulacao', 'Manipulação'], ['visao', 'Visão'], ['audicao', 'Audição'], ['respiracao', 'Respiração'], ['circulacao', 'Circulação sanguínea'], ['bombeamento', 'Bombeamento']];
+function perdaSangue(c) { return clamp(100 - saude(c).sangue, 0, 100); }
+const ESTAGIO_SANGUE = p => p >= 60 ? 'extrema' : p >= 45 ? 'severa' : p >= 30 ? 'moderada' : p >= 15 ? 'leve' : '';
+function capacidades(c) {
+  const s = saude(c), E = (id, ch) => eficiencia(c, id, ch);
+  const perda = perdaSangue(c);
+  const bomb = E('coracao'), resp = media([E('pulmaoD'), E('pulmaoE')]);
+  const fSangue = perda < 15 ? 1 : perda < 30 ? lerp(1, 0.9, (perda - 15) / 15) : perda < 45 ? lerp(0.9, 0.8, (perda - 30) / 15) : perda < 60 ? lerp(0.8, 0.6, (perda - 45) / 15) : lerp(0.28, 0.05, clamp((perda - 60) / 40, 0, 1)); // estágios: leve, moderada, severa (-40%), extrema (cai)
+  const circ = clamp(fSangue * (0.25 + 0.75 * bomb), 0, 1);
+  let filt;
+  let mov, manip, visao, audicao;
+  if (c.animal) {
+    const pernas = ['DE', 'DD', 'TE', 'TD'].map(k => E('perna' + k) * (faltando(c, 'casco' + k) ? 0.6 : 0.6 + 0.4 * E('casco' + k)));
+    const boas = pernas.filter(v => v > 0.1).length;
+    mov = media(pernas) * (boas >= 4 ? 1 : boas === 3 ? 0.85 : boas === 2 ? 0.45 : 0.1) * (0.3 + 0.7 * E('coluna'));
+    manip = 0.5 + 0.5 * E('focinho'); visao = media([E('olhoD'), E('olhoE')]); audicao = 1; filt = E('figado');
+  } else {
+    const lado = sd => E('mao' + sd) * (0.5 + 0.5 * media([1, 2, 3, 4, 5].map(k => E(`dedo${k}${sd}`, false))));
+    manip = media([lado('D'), lado('E')]);
+    const perna = sd => E('pe' + sd) * (0.85 + 0.15 * media([1, 2, 3, 4, 5].map(k => E(`artelho${k}${sd}`, false))));
+    const pernas = [perna('D'), perna('E')], pior = Math.min(...pernas), melhor = Math.max(...pernas);
+    mov = (melhor * 0.42 + pior * 0.58) * (0.15 + 0.85 * E('coluna')) * (pior < 0.05 ? 0.35 : 1);
+    visao = media([E('olhoD'), E('olhoE')]); audicao = media([E('orelhaD'), E('orelhaE')]); filt = Math.min(E('figado'), Math.max(E('rimD'), E('rimE')));
+  }
+  const dor = s.dor || 0;
+  let consc = E('cerebro') * (1 - 0.35 * clamp(dor - 0.1, 0, 1)) * fSangue * (0.15 + 0.85 * bomb) * (0.15 + 0.85 * resp) * (0.4 + 0.6 * filt);
+  if (s.infTotal) consc *= 1 - 0.35 * s.infTotal;
+  consc = clamp(consc, 0, 1);
+  const kc = clamp(consc / 0.85, 0, 1);
+  return { consciencia: consc, movimento: clamp(mov * kc * (0.6 + 0.4 * circ), 0, 1), manipulacao: clamp(manip * kc, 0, 1), visao: clamp(visao, 0, 1), audicao: clamp(audicao, 0, 1),
+    respiracao: resp, circulacao: circ, bombeamento: bomb, filtragem: filt };
+}
+const capDe = c => { const s = saude(c); if (!s.cap) s.cap = capacidades(c); return s.cap; };
+const fatorMov = c => !c.saude || (!c.saude.feridas.length && !c.saude.perdidas.length && c.saude.sangue >= 100) ? 1 : clamp(capDe(c).movimento, 0.08, 1);
+const fatorTrab = c => !c.saude || (!c.saude.feridas.length && !c.saude.perdidas.length && c.saude.sangue >= 100) ? 1 : clamp(capDe(c).manipulacao * (0.55 + 0.45 * capDe(c).consciencia), 0.1, 1);
+const fatorMira = c => !c.saude ? 1 : clamp((0.45 + 0.55 * capDe(c).visao) * (0.5 + 0.5 * capDe(c).manipulacao), 0.15, 1);
+/* ---------------- dano: escolher a parte pela cobertura, penetrar, destruir ---------------- */
+const PESO_ALTURA = { baixo: { perna: 2.4, pe: 2.4, mao: 1.2, braco: 1.2, torso: 0.6, cabeca: 0.25 }, alto: { torso: 1.3, cabeca: 1.6, braco: 1.2, mao: 1, perna: 0.6, pe: 0.35 } };
+function escolherParte(c, alt) {
+  const A = anatDe(c), W = alt && PESO_ALTURA[alt]; let tot = 0; const l = [];
+  for (const id of A.ordem) { const P = A.partes[id]; if (P.prof !== 'fora' || faltando(c, id)) continue;
+    let w = P.exc; if (W) w *= W[P.g] ?? 1; if (w > 0) { l.push([id, w]); tot += w; } }
+  let r = rnd() * tot; for (const [id, w] of l) if ((r -= w) <= 0) return id;
+  return A.raiz;
+}
+function filhosDentro(c, id) { const A = anatDe(c); return A.partes[id].filhos.filter(f => A.partes[f].prof === 'dentro' && !faltando(c, f)); }
+// golpe "de verdade": parte por cobertura; cortes/perfurações podem atravessar para órgãos/ossos
+function golpear(c, tipo, dano, origem, op = {}) {
+  if (saude(c).morto || (c.animal && c.morto)) return [];
+  let id = op.parte || escolherParte(c, op.alt);
+  const out = [];
+  let resto = dano;
+  for (let prof = 0; prof < 3; prof++) {
+    const dentro = filhosDentro(c, id);
+    const chance = !dentro.length ? 0 : (tipo === 'contusao' ? 0.18 : tipo === 'perfuracao' ? 0.62 : tipo === 'queimadura' ? 0.05 : 0.38) + clamp(resto / hpMax(c, id), 0, 1) * 0.25;
+    if (!dentro.length || rnd() >= chance) { out.push(aplicarDano(c, id, tipo, resto, origem)); break; }
+    // atravessou: a parte de fora leva uma parte do dano; a de dentro leva o resto
+    const A = anatDe(c), tot = dentro.reduce((s, f) => s + A.partes[f].cob, 0); let r = rnd() * tot, alvo = dentro[0];
+    for (const f of dentro) if ((r -= A.partes[f].cob) <= 0) { alvo = f; break; }
+    out.push(aplicarDano(c, id, tipo, resto * 0.45, origem, { semLog: true }));
+    resto *= 0.7; id = alvo; st10('penetracoes');
+  }
+  return out.filter(Boolean);
+}
+// dano numa parte específica (também usado pelo modo dev e por saves antigos)
+function aplicarDano(c, id, tipo, dano, origem, op = {}) {
+  const s = saude(c), A = anatDe(c);
+  if (s.morto) return null;
+  while (id && faltando(c, id)) id = A.partes[id].pai; // parte que não existe mais: acerta o coto (pai)
+  if (!id) return null;
+  const P = A.partes[id]; if (!FERIDA[tipo]) tipo = 'contusao';
+  dano = Math.max(0.5, dano);
+  const cur = hpAtual(c, id);
+  const v = visDe(c); v.careta = 1; v.golpe = 0.3; st10('feridas');
+  if (!op.semFx) respingo(c.x, c.y, corta(tipo) ? 1 : 0.35);
+  // ossos indestrutíveis (crânio, costelas, coluna, clavículas, pelve): racham/quebram, não somem
+  if (P.osso) {
+    const d = Math.min(dano, Math.max(0, cur - 1));
+    const tp = dano >= cur * 0.45 || cur - dano <= 1 ? 'fratura' : 'trinca';
+    const ja = s.feridas.find(f => f.parte === id && (f.tipo === 'fratura' || (f.tipo === 'trinca' && tp === 'trinca')));
+    let f; if (ja) { ja.dano = Math.min(P.hp - 1, ja.dano + d); if (tp === 'fratura') ja.tipo = 'fratura'; f = ja; atualizarSev(c, f); }
+    else f = novaFerida(c, id, tp, Math.max(0.5, d));
+    if (tp === 'fratura') st10('fraturas');
+    if (!op.semLog) logFerida(c, f, origem);
+    recalcularSaude(c); return f;
+  }
+  if (dano >= cur - 0.01 || (P.pequeno && corta(tipo) && dano > cur * 0.45 && rnd() < 0.25 + dano / cur * 0.35)) { destruirParte(c, id, tipo, origem); return s.feridas.find(f => f.parte === id && f.tipo === 'perda') || null; }
+  const f = novaFerida(c, id, tipo, dano);
+  if (!op.semLog) logFerida(c, f, origem);
+  // contundente em parte com osso: chance de fratura (ou trinca)
+  if (tipo === 'contusao' && P.temOsso && !s.feridas.some(g => g.parte === id && g.tipo === 'fratura')) {
+    const q = rnd(), k = dano / P.hp;
+    if (q < 0.55 * k) { const fr = novaFerida(c, id, 'fratura', Math.min(hpAtual(c, id) - 0.5, dano * 0.4 + 2)); st10('fraturas'); log(`${c.nome}: o osso — ${P.nome.toLowerCase()} — quebrou!`, 'ruim'); }
+    else if (q < 0.9 * k) novaFerida(c, id, 'trinca', Math.min(hpAtual(c, id) - 0.5, 1.5));
+  }
+  recalcularSaude(c); return f;
+}
+function novaFerida(c, id, tipo, dano) {
+  const s = saude(c), P = anatDe(c).partes[id], F = FERIDA[tipo];
+  const f = { id: ++s.prox, parte: id, tipo, dano, dano0: dano, sev: 0, sangra: F.sangra * dano * (P.prof === 'dentro' ? 1.25 : 1), trat: 0, idade: 0, infec: 0, imune: 0, infTrat: 0, infT: 0, infRolou: false,
+    limpo: false, band: false, tala: false, pressionado: false, quando: agora() };
+  if (f.sangra > 10) f.sangra = 10;
+  atualizarSev(c, f); s.feridas.push(f); s.cap = null; return f;
+}
+function logFerida(c, f, origem) {
+  const P = anatDe(c).partes[f.parte];
+  if (c.animal && !inspecaoAnimal(c)) return;
+  log(`${c.nome}: ${FERIDA[f.tipo].nome.toLowerCase()} — ${P.nome.toLowerCase()}${origem ? ' (' + origem + ')' : ''}${f.sangra ? ', sangramento ' + nivelSangra(f) : ''}.`, c.animal ? '' : 'ruim');
+}
+const inspecaoAnimal = a => typeof inspecao !== 'undefined' && inspecao && inspecao.animal === a;
+function descendentes(c, id) { const A = anatDe(c), l = []; const vai = k => { for (const f of A.partes[k].filhos) { l.push(f); vai(f); } }; vai(id); return l; }
+function destruirParte(c, id, tipo, origem) {
+  const s = saude(c), A = anatDe(c), P = A.partes[id];
+  const tudo = [id, ...descendentes(c, id)];
+  s.feridas = s.feridas.filter(f => !tudo.includes(f.parte));
+  for (const k of tudo) if (!s.perdidas.includes(k)) s.perdidas.push(k);
+  const tam = Math.min(P.hp, 30);
+  const f = novaFerida(c, id, 'perda', tam); f.sangra = P.prof === 'dentro' ? Math.min(10, P.hp * 0.4) : tipo === 'queimadura' ? 1 : Math.min(12, tam * 0.4); f.causa = tipo;
+  st10('partesPerdidas');
+  const sub = tudo.length > 1 ? ` (junto: ${tudo.slice(1).filter(k => A.partes[k].prof === 'fora').map(k => A.partes[k].nome.toLowerCase()).slice(0, 4).join(', ')}${tudo.length > 5 ? '…' : ''})` : '';
+  if (!c.animal || inspecaoAnimal(c)) log(`${c.nome} ${P.prof === 'dentro' ? 'teve destruído(a)' : 'perdeu'}: ${P.nome.toLowerCase()}${sub}${origem ? ' — ' + origem : ''}!`, 'ruim');
+  if (!c.animal) { respingo(c.x, c.y, 1.4); if (P.g === 'mao' || P.g === 'braco') { const cp = capacidades(c); if (cp.manipulacao < 0.12 && c.arma) { largarItem(Math.round(c.x), Math.round(c.y), c.arma.toUpperCase(), 1); log(`${c.nome} não consegue mais segurar a arma.`); c.arma = null; } } }
+  s.cap = null;
+  if (P.vital) return morrer(c, `${P.nome} destruído(a)`);
+  recalcularSaude(c);
+}
+/* ---------------- dor, capacidades, cair, morrer ---------------- */
+function dorDe(c) {
+  const s = saude(c); let dor = 0, inf = 0;
+  for (const f of s.feridas) {
+    const F = FERIDA[f.tipo]; let d = F.dor * (f.tipo === 'perda' ? Math.min(f.dano, 30) : f.dano);
+    if (f.trat) d *= f.tipo === 'perda' ? 0.3 : 1 - 0.5 * f.trat; if (f.tala) d *= 0.6;
+    if (f.tipo === 'perda' && f.idade > 3 * 1440) d *= 0.3;
+    dor += d + 0.12 * f.infec; inf = Math.max(inf, f.infec);
+  }
+  s.infTotal = inf;
+  return clamp(1 - Math.exp(-dor * 1.1), 0, 1); // várias feridas somam, mas com retorno decrescente
+}
+const LIMIAR_CHOQUE = 0.8;
+function recalcularSaude(c) {
+  const s = saude(c); if (s.morto) return;
+  s.dor = dorDe(c); s.cap = capacidades(c);
+  const k = s.cap, perda = perdaSangue(c);
+  // morte: parte vital destruída (tratada em destruirParte), sem sangue, coração/pulmões parados, consciência zerada
+  if (perda >= 100) return morrer(c, 'perda de sangue');
+  if (k.bombeamento <= 0.01) return morrer(c, 'coração parou');
+  if (k.respiracao <= 0.01) return morrer(c, 'não consegue respirar');
+  if (k.filtragem <= 0.01) return morrer(c, 'falência dos órgãos');
+  if (k.consciencia <= 0.02 || eficiencia(c, 'cerebro') <= 0.1) return morrer(c, 'perdeu a consciência para sempre');
+  s.inconsciente = k.consciencia < 0.12;
+  const choque = s.dor >= LIMIAR_CHOQUE;
+  s.choque = choque;
+  const cai = k.consciencia < 0.3 || k.movimento < 0.15 || choque;
+  if (c.animal) { atualizarAnimalSaude(c, cai); return; }
+  if (!s.caido && cai) cair(c);
+  else if (s.caido && !cai && k.consciencia >= 0.36 && k.movimento >= 0.2 && s.dor < LIMIAR_CHOQUE - 0.08) levantarDoChao(c);
+}
+function cair(c) {
+  const s = saude(c); s.caido = true;
+  cancelar(c); c.vel = 0; c.caminho = []; c.agachado = false;
+  c.anim = { tipo: 'desmaiar', t: 0, dur: 0.8 }; contarAnim('desmaiar');
+  st10('desmaios');
+  const k = s.cap || capacidades(c), por = s.choque ? 'choque de dor' : perdaSangue(c) >= 45 ? 'perdeu muito sangue' : k.consciencia < 0.3 ? 'consciência baixa' : k.movimento < 0.15 ? 'não consegue andar' : 'ferimentos';
+  log(`${c.nome} caiu${s.inconsciente ? ' inconsciente' : ''} (${por})!`, 'ruim');
+  if (estado.stats.desmaios <= 3) carta(`${c.nome} caiu`, `${c.nome} está caído(a) e não consegue se mexer (${por}).\n\nUm colono com a prioridade Médico vai resgatá-lo(a) até uma cama e tratar os ferimentos. Bandagens (feitas na bancada) dão um tratamento muito melhor.`, 'ruim');
+}
+function levantarDoChao(c) {
+  const s = saude(c); s.caido = false;
+  if (c.carregadoPor) return;
+  if (c.tarefa && c.tarefa.tipo === 'repousar') return;
+  c.anim = { tipo: 'levantar', t: 0, dur: 1.3 }; contarAnim('levantar');
+  c.tarefa = null; c.caminho = [];
+  log(`${c.nome} recuperou os sentidos e se levanta.`, 'bom');
+}
+const contarAnim = an => { estado.stats.anims[an] = (estado.stats.anims[an] || 0) + 1; };
+const cadaveres = [];
+function morrer(c, causa) {
+  const s = saude(c); if (s.morto) return;
+  s.morto = true; s.causa = causa; s.caido = true;
+  if (c.animal) { if (!c.morto) morrerAnimal(c, c.ultAutor || null, causa); return; }
+  st10('mortes');
+  const corpo = { nome: c.nome, x: Math.round(c.x), y: Math.round(c.y), causa, quando: agora(), c, t: 0 };
+  for (const o of colonos) if (o !== c) memorizar(o, 'morte_' + c.nome, `${c.nome} morreu`, (o.opiniao[c.nome] || 0) > 20 ? -20 : -12, 5 * 24);
+  const p = c.carregadoPor; if (p) { c.carregadoPor = null; if (p.tarefa) fim(p); }
+  removerColono(c);
+  c.tarefa = null; c.anim = null; c.carregadoPor = c.resgatador = c.medico = null;
+  cadaveres.push(corpo);
+  log(`☠ ${c.nome} morreu (${causa}).`, 'ruim');
+  carta(`${c.nome} morreu`, `${c.nome} morreu: ${causa}.\n\nOs outros colonos estão abalados.${colonos.length ? '' : '\n\nNão sobrou ninguém na colônia. Comece um novo mapa em Opções.'}`, 'ruim');
+  if (!colonos.length) { estado.pausado = true; $('pausado').style.display = 'block'; }
+}
+function ressuscitar(corpo) {
+  const k = cadaveres.indexOf(corpo); if (k < 0) return null;
+  cadaveres.splice(k, 1);
+  const c = corpo.c; c.saude = novaSaude(); c.x = c.ax = corpo.x; c.y = c.ay = corpo.y; c.fome = Math.max(c.fome, 60); c.sono = Math.max(c.sono, 60);
+  c.tarefa = null; c.caminho = []; c.anim = { tipo: 'levantar', t: 0, dur: 1.3 }; c.dormindo = false; c.carregando = null;
+  colonos.push(c); for (const o of colonos) if (o !== c) { o.memorias = o.memorias.filter(m => m.chave !== 'morte_' + c.nome); o.opiniao[c.nome] = o.opiniao[c.nome] || 0; }
+  montarRetratos(); log(`${c.nome} voltou à vida!`, 'bom'); return c;
+}
+/* ---------------- tempo: sangramento, infecção (corrida contra a imunidade), cura, cicatriz ---------------- */
+function ferir(c, parte, tipo, sev, origem) { // compatível com a v8: gravidade 0..1 da parte
+  const A = anatDe(c); if (!A.partes[parte]) parte = A.raiz;
+  if (tipo === 'mordida' || tipo === 'corte') { /* ok */ }
+  return aplicarDano(c, parte, tipo, clamp(sev, 0.05, 1) * A.partes[parte].hp * 0.9, origem);
+}
+const BASE_INFEC = f => (FERIDA[f.tipo].infec || 0) * 0.6;
+function atualizarSaude(c, horas) {
+  const s = saude(c); if (s.morto) return;
+  if (!s.feridas.length && s.sangue >= 100) { if (s.dor) { s.dor = 0; s.cap = null; } if (s.caido) recalcularSaude(c); return; }
+  const t = c.tarefa, repouso = (t && t.tipo === 'repousar' && t.fase === 'deitado') || s.caido, camaReal = t && t.tipo === 'repousar' && t.camaReal;
+  let sangraTot = 0, mudou = false;
+  for (const f of s.feridas) {
+    f.idade += horas * 60;
+    if (f.sangra > 0) { sangraTot += f.sangra; f.sangra = Math.max(0, f.sangra - horas * (f.sangra < 5 ? 0.7 : f.sangra < 10 ? 0.25 : 0.12) * (repouso ? 1.5 : 1)); }
+    // infecção: um sorteio por ferida depois de 3 h; cuidado bom (e ferida limpa) reduz a chance
+    if (!f.infRolou && f.idade > 180 && BASE_INFEC(f) > 0) {
+      f.infRolou = true;
+      const p = BASE_INFEC(f) * (f.trat ? (1 - f.trat) * 0.75 + 0.05 : 1) * (f.limpo ? 0.45 : 1) * (c.animal ? 0.3 : 1);
+      if (rnd() < p) { f.infec = 0.04; f.imune = 0; st10('infeccoes'); if (!c.animal) log(`A ferida (${anatDe(c).partes[f.parte].nome.toLowerCase()}) de ${c.nome} infeccionou!`, 'ruim'); }
+    }
+    if (f.infec > 0) { // corrida: infecção (piora ~0,84/dia sem tratar) contra imunidade (~0,64/dia)
+      const tq = f.infTrat && agora() - f.infT < 720 ? f.infTrat : 0;
+      if (!f.immK) f.immK = 0.88 + rnd() * 0.42; // cada corpo reage diferente
+      f.infec = clamp(f.infec + horas * (0.03 - 0.028 * tq), 0, 1);
+      f.imune = clamp(f.imune + horas * 0.0285 * f.immK * (camaReal ? 1.2 : repouso ? 1.1 : 1) * (c.fome !== undefined && c.fome < 20 ? 0.75 : 1), 0, 1);
+      if (f.imune >= 1) { f.infec = 0; f.infCurada = true; f.infTrat = 0; st10('infeccoesCuradas'); if (!c.animal) log(`${c.nome} ganhou a corrida contra a infecção (imunidade completa).`, 'bom'); }
+      else if (f.infec >= 1) { st10('mortesInfeccao'); return morrer(c, 'infecção'); }
+      mudou = true;
+    }
+    if (permanente(f)) { if (f.trat && f.sangra) f.sangra = 0; continue; }
+    // cura: tratada cura bem mais rápido; fratura sem tala quase não cura
+    const q = f.trat || 0;
+    let taxa = (0.12 + 0.7 * q) * (camaReal ? 1.4 : repouso ? 1.2 : 1);
+    if (f.tipo === 'fratura') taxa *= f.tala ? 0.35 : 0; // sem tala o osso não cola if (f.tipo === 'trinca') taxa *= 0.5;
+    if (f.infec > 0.25) taxa *= 0.3;
+    const d0 = f.dano; f.dano = Math.max(0, f.dano - taxa * horas);
+    if (f.dano !== d0) { atualizarSev(c, f); mudou = true; }
+  }
+  // feridas curadas: algumas viram cicatriz (cortes, mordidas, queimaduras grandes mal tratadas)
+  const fic = [], cur = [];
+  for (const f of s.feridas) {
+    if (permanente(f) || f.dano > 0.3 || f.infec > 0) { fic.push(f); continue; }
+    cur.push(f);
+    if (f.dano0 >= 8 && ['corte', 'mordida', 'queimadura', 'arranhao', 'perfuracao'].includes(f.tipo) && rnd() < 0.4 * (1 - (f.trat || 0) * 0.7)) {
+      const ci = { id: ++s.prox, parte: f.parte, tipo: 'cicatriz', dano: Math.min(3, f.dano0 * 0.12), dano0: 0, sev: 0, sangra: 0, trat: 1, idade: 0, infec: 0, imune: 0, infRolou: true, de: f.tipo };
+      atualizarSev(c, ci); fic.push(ci); st10('cicatrizes');
+      if (!c.animal) log(`O ${FERIDA[f.tipo].nome.toLowerCase()} de ${c.nome} (${anatDe(c).partes[f.parte].nome.toLowerCase()}) deixou uma cicatriz.`);
+    }
+  }
+  if (cur.length) { st10('curadas', cur.length); s.feridas = fic; mudou = true; if (!c.animal && !s.feridas.some(f => !permanente(f))) log(`${c.nome} está curado(a).`, 'bom'); }
+  const regen = sangraTot ? 0 : 1.6 * horas * (c.fome !== undefined && c.fome < 15 ? 0.4 : 1);
+  const s0 = s.sangue; s.sangue = clamp(s.sangue - sangraTot * horas + regen, 0, 100);
+  if (mudou || s.sangue !== s0) recalcularSaude(c);
+}
+const taxaSangramento = c => saude(c).feridas.reduce((t, f) => t + f.sangra, 0);
+function piorEm(c, grupos) {
+  let w = 0, f0 = null; if (!c.saude) return { w, f: null };
+  const A = anatDe(c);
+  for (const f of c.saude.feridas) { const P = A.partes[f.parte]; if (!P || !grupos.includes(P.g)) continue;
+    const v = f.tipo === 'perda' ? (P.pequeno ? 0.25 : 1.2) : f.tipo === 'cicatriz' ? 0 : f.sev * (f.tipo === 'fratura' ? (f.tala ? 0.7 : 1.1) : 0.6) * (f.trat ? 0.75 : 1) + f.infec * 0.3;
+    if (v > w) { w = v; f0 = f; } }
+  return { w, f: f0 };
+}
+const infecPede = f => f.infec > 0 && (!f.infTrat || agora() - f.infT > 360);
+const feridaPede = f => f.tipo !== 'cicatriz' && (infecPede(f) || (!f.trat && (f.sangra > 0 || !['contusao', 'trinca'].includes(f.tipo) || f.sev > 0.3)) || (f.tipo === 'fratura' && !f.tala));
+const precisaTratar = c => !!c.saude && !c.saude.morto && c.saude.feridas.some(feridaPede);
+const PRIO_FERIDA = f => (f.sangra >= 6 ? 0 : infecPede(f) ? 1 : f.sangra > 0 ? 2 : f.tipo === 'fratura' ? 3 : 4) - f.sev * 0.5 - (f.sangra || 0) * 0.01;
+/* ---------------- tratamento: remédio (bandagem simples/boa) × habilidade do médico ---------------- */
+const GRUPO_TRAT = { cabeca: 'tratarCabeca', torso: 'tratarTorso', braco: 'tratarBraco', mao: 'tratarMao', perna: 'tratarPerna', pe: 'tratarPe' };
+const GRUPO_BAND = { cabeca: 'bandagemCabeca', torso: 'bandagemTorso', braco: 'bandagemBraco', mao: 'bandagemBraco', perna: 'bandagemPerna', pe: 'bandagemPerna' };
+const NOME_TRAT = { tratarPerna: 'trata a perna', tratarPe: 'trata o pé', tratarBraco: 'trata o braço', tratarMao: 'trata a mão', tratarCabeca: 'trata a cabeça', tratarTorso: 'trata o torso',
+  bandagemPerna: 'enfaixa a perna', bandagemBraco: 'enfaixa o braço', bandagemCabeca: 'enfaixa a cabeça', bandagemTorso: 'enfaixa o torso', talaPerna: 'imobiliza a perna (tala)', talaBraco: 'imobiliza o braço (tala)',
+  pressionar: 'pressiona o sangramento', limpar: 'limpa e desinfeta a ferida', tratarInfeccao: 'trata a infecção', examinar: 'examina (pulso)', ajudarSentar: 'ajuda a sentar', tratarNaCama: 'cuida na cama' };
+const DUR_TRAT = { pressionar: 24, limpar: 16, tratarInfeccao: 34, examinar: 12, ajudarSentar: 14, tratarNaCama: 26, talaPerna: 40, talaBraco: 36, bandagemPerna: 30, bandagemBraco: 28, bandagemCabeca: 30, bandagemTorso: 32 };
+const gDe = (c, f) => (anatDe(c).partes[f.parte] || { g: 'torso' }).g;
+function escolherTratamento(p, f, temBand) {
+  const g = gDe(p, f);
+  if (infecPede(f)) return 'tratarInfeccao';
+  if (f.sangra >= 6 && !f.pressionado) return 'pressionar';
+  if (f.tipo === 'fratura' && !f.tala) return g === 'perna' || g === 'pe' ? 'talaPerna' : g === 'braco' || g === 'mao' ? 'talaBraco' : GRUPO_BAND[g];
+  if ((corta(f.tipo) || f.tipo === 'perda' || f.tipo === 'queimadura') && !f.limpo && f.sangra < 18) return 'limpar';
+  if (!['contusao', 'trinca'].includes(f.tipo) && temBand) return GRUPO_BAND[g];
+  if (pacienteNaCama(p) && f.tipo === 'contusao') return 'tratarNaCama';
+  return GRUPO_TRAT[g];
+}
+const REMEDIO = { boa: { nome: 'bandagem boa', q: 0.95 }, simples: { nome: 'bandagem simples', q: 0.72 }, nenhum: { nome: 'sem remédio', q: 0.42 } };
+const remedioDe = m => (m.bandBoas || 0) > 0 ? 'boa' : (m.bandagens || 0) > 0 ? 'simples' : 'nenhum';
+function habMed(m) { if (m.habMed === undefined) m.habMed = 3 + Math.floor(rnd() * 5) + (m.prioridades && m.prioridades.medico === 1 ? 2 : 0); return m.habMed; }
+function qualidadeTrat(m, med) { return clamp(REMEDIO[med].q * (0.55 + 0.045 * habMed(m)) + (rnd() - 0.5) * 0.16, 0.08, 1); }
+function ganharXpMed(m, n = 1) {
+  m.xpMed = (m.xpMed || 0) + n; const prox = 4 + habMed(m) * 1.5;
+  if (m.xpMed >= prox && m.habMed < 20) { m.xpMed -= prox; m.habMed++; st10('nivelMedico'); log(`${m.nome} melhorou como médico(a): habilidade ${m.habMed}.`, 'bom'); }
+}
+function aplicarTratamento(m, p, f, an) {
+  st10('tratamentos');
+  if (an === 'examinar') { saude(p).examinado = agora(); ganharXpMed(m, 0.3); return; }
+  if (an === 'ajudarSentar') { p.sentado = true; return; }
+  if (!f) return;
+  const usaBand = an.startsWith('bandagem') || an.startsWith('tala') || an === 'tratarInfeccao';
+  const med = usaBand ? remedioDe(m) : 'nenhum', q = qualidadeTrat(m, med);
+  if (usaBand && med === 'boa') { m.bandBoas--; st10('bandagensBoasUsadas'); st10('bandagensUsadas'); } else if (usaBand && med === 'simples') { m.bandagens--; st10('bandagensUsadas'); }
+  if (an === 'pressionar') { f.pressionado = true; f.sangra = Math.min(f.sangra, f.sangra * 0.3, 7); }
+  else if (an === 'limpar') { f.limpo = true; f.sangra *= 0.7; }
+  else if (an === 'tratarInfeccao') { f.infTrat = q; f.infT = agora(); st10('infeccoesTratadas'); }
+  else if (an.startsWith('tala')) { f.tala = true; f.band = med !== 'nenhum'; f.trat = Math.max(f.trat, q); f.remedio = med; }
+  else if (an.startsWith('bandagem')) { f.band = med !== 'nenhum'; f.trat = Math.max(f.trat, q); f.remedio = med; f.sangra = 0; }
+  else { f.trat = Math.max(f.trat, q * 0.75); f.remedio = 'nenhum'; f.sangra = 0; }
+  if (f.trat) { f.qualTxt = Math.round(f.trat * 100); f.tratPor = m.nome; }
+  if (f.tipo === 'perda' && f.trat) f.sangra = 0;
+  ganharXpMed(m, 1 + (q > 0.8 ? 0.5 : 0));
+  st10('somaQualidade', Math.round(q * 100));
+  recalcularSaude(p);
+}
+/* ---------------- animais: mesma anatomia, caçada fere partes específicas, mancar ---------------- */
+function atualizarAnimalSaude(a, cai) {
+  const E = ESP_ANIMAL[a.esp], s = a.saude, k = s.cap;
+  a.hp = Math.max(0.5, E.hp * clamp(Math.min(k.consciencia, 0.35 + 0.65 * k.movimento, 1 - perdaSangue(a) / 100) * (1 - 0.4 * s.dor), 0, 1));
+  if (cai && !s.caido) { s.caido = true; a.estado = 'caido'; a.caminho = []; a.vel = 0; a.atk = 0; st10('animaisCaidos'); log(`O(a) ${E.nome.toLowerCase()} caiu ferido(a) e não consegue fugir.`, 'bom'); }
+  else if (!cai && s.caido && k.movimento > 0.25 && s.dor < 0.7) { s.caido = false; a.estado = 'vagar'; a.pensar = 1; }
+}
+const fatorMovAnimal = a => a.saude ? clamp(capDe(a).movimento * (1 - 0.25 * a.saude.dor), 0.12, 1) : 1;
+function pernaMancaAnimal(a) { // perna mais machucada (0..3) e quanto manca
+  if (!a.saude || !a.saude.feridas.length && !a.saude.perdidas.length) return null;
+  let m = null, mv = 0.12;
+  for (const [k, id] of ['pernaDE', 'pernaDD', 'pernaTE', 'pernaTD'].entries()) { const v = 1 - eficiencia(a, id) * (faltando(a, 'casco' + id.slice(5)) ? 0.6 : eficiencia(a, 'casco' + id.slice(5), false) * 0.4 + 0.6); if (v > mv) { mv = v; m = k; } }
+  return m === null ? null : { perna: m, k: clamp(mv * 1.3, 0, 1), falta: faltando(a, ['pernaDE', 'pernaDD', 'pernaTE', 'pernaTD'][m]) };
+}
+function golpeAnimal(a, c) { // animal ataca colono: mordida (lobo, baixo) ou garra/patada (urso, alto)
+  const v = visDe(c);
+  if (c.escudo && rnd() < 0.42) { v.bloqueio = 0.5; st10('bloqueios'); faiscasEscudo(c, a); return; }
+  if (rnd() > (a.esp === 'urso' ? 0.7 : 0.55) * (0.6 + 0.4 * fatorMovAnimal(a))) return; // errou
+  st10('ataques');
+  if (a.esp === 'urso') { const q = rnd(); if (q < 0.55) golpear(c, q < 0.2 ? 'arranhao' : 'corte', 8 + rnd() * 10, 'garras do urso', { alt: 'alto' }); else golpear(c, 'contusao', 7 + rnd() * 10, 'patada do urso', { alt: 'alto' }); }
+  else if (a.esp === 'lobo') { if (rnd() < 0.8) golpear(c, 'mordida', 4.5 + rnd() * 6, 'mordida de lobo', { alt: 'baixo' }); else golpear(c, 'arranhao', 3 + rnd() * 4, 'lobo', { alt: 'baixo' }); }
+  else golpear(c, 'contusao', 4 + rnd() * 6, 'chifrada', {});
+}
+const TIPO_GOLPE = { espada: 'corte', machado: 'corte', picareta: 'perfuracao', socar: 'contusao' };
+function golpearAnimal(c, a, tp) {
+  const d = Math.hypot(a.x - c.x, a.y - c.y);
+  if (tp === 'arco') {
+    if (c.flechas <= 0) return;
+    c.flechas--; st10('flechas');
+    const acerta = rnd() < clamp((0.88 - d * 0.04 - (a.vel > 2.2 ? 0.18 : 0) - (saude(c).dor * 0.2)) * fatorMira(c), 0.15, 0.92);
+    const ex = acerta ? 0 : (rnd() - 0.5) * 2.4, ey = acerta ? 0 : (rnd() - 0.5) * 2.4;
+    projeteis.push({ x0: c.x, y0: c.y, x1: a.x + ex, y1: a.y + ey, t: 0, dur: Math.max(0.12, d / 17), presa: a, acerta, dano: 11 + rnd() * 6, autor: c });
+    a.alerta = 1.2; return;
+  }
+  if (rnd() > (tp === 'socar' ? 0.7 : 0.82) * (0.5 + 0.5 * fatorMira(c))) return;
+  ferirAnimal(a, DANO_ANIM[tp] * (0.6 + 0.4 * fatorTrab(c)) * (0.85 + rnd() * 0.3), c, TIPO_GOLPE[tp] || 'corte');
+}
+function ferirAnimal(a, dano, autor, tipo = 'perfuracao') {
+  if (a.morto) return;
+  a.ultAutor = autor; visDe(a).golpe = 0.3; a.alerta = 1.5; a.cacado = true;
+  const fs = golpear(a, tipo, dano, autor ? autor.nome : '', {});
+  st10('golpesAnimais');
+  if (a.morto) return;
+  if (a.saude.caido) return;
+  if (a.esp === 'veado') { if (a.stamina > 0.15 && a.estado !== 'fugir') { const cam = fugirDe(a, autor, 10); if (cam) { a.estado = 'fugir'; a.caminho = cam; a.stamina -= 0.3; } } }
+  else if (a.estado !== 'partir') { atacar(a, autor, null); for (const o of animais) if (o !== a && o.bando === a.bando && !o.morto && o.estado !== 'partir' && o.estado !== 'atacar') atacar(o, autor, null); }
+  return fs;
+}
+function morrerAnimal(a, autor, causa) {
+  a.morto = true; a.estado = 'morto'; a.t = 0; a.caminho = []; a.vel = 0; a.cacar = false; a.hp = 0;
+  if (a.saude) { a.saude.morto = true; a.saude.causa = causa || a.saude.causa; }
+  st10('abatidos');
+  log(`${autor ? autor.nome + ' abateu' : 'Morreu'} um(a) ${a.nome.toLowerCase()}${causa ? ' (' + causa + ')' : ''}. A carcaça pode ser carneada na bancada.`, 'bom');
+}
+/* ---------------- diagrama anatômico (SVG, vista de frente; D = esquerda de quem olha) ---------------- */
+const GEO = {}; // id -> {t:'e'|'p'|'r', ...}
+(() => {
+  const E = (id, cx, cy, rx, ry, rot = 0) => { GEO[id] = { t: 'e', cx, cy, rx, ry, rot, c: [cx, cy] }; };
+  const Pth = (id, d, c) => { GEO[id] = { t: 'p', d, c }; };
+  const espelhaD = d => d.replace(/(-?\d+(?:\.\d+)?)[ ,](-?\d+(?:\.\d+)?)/g, (m, x, y) => `${(120 - parseFloat(x)).toFixed(1).replace(/\.0$/, '')} ${y}`);
+  const par = (base, fn) => { fn('D', 1); fn('E', -1); };
+  E('cabeca', 60, 23, 14, 17); E('cranio', 60, 19, 12.5, 13); Pth('cerebro', 'M49 18 Q48 7 60 6 Q72 7 71 18 Q70 25 60 25 Q50 25 49 18Z', [60, 15]);
+  E('olhoD', 54.5, 24, 3, 2.4); E('olhoE', 65.5, 24, 3, 2.4); E('orelhaD', 45.5, 25, 2.6, 5); E('orelhaE', 74.5, 25, 2.6, 5);
+  Pth('nariz', 'M60 25 L56.8 32 Q60 33.6 63.2 32Z', [60, 30]); Pth('mandibula', 'M48.5 31 Q50 41.5 60 42.5 Q70 41.5 71.5 31 L67.5 33.5 Q60 38 52.5 33.5Z', [60, 38.5]);
+  Pth('pescoco', 'M53.5 39 L66.5 39 L67.5 51 L52.5 51Z', [60, 46]);
+  Pth('torso', 'M41 52 Q60 47 79 52 Q86 56 84 67 L78 101 Q60 105 42 101 L36 67 Q34 56 41 52Z', [60, 78]);
+  Pth('quadril', 'M42 101 Q60 105 78 101 L82 119 Q60 125 38 119Z', [60, 112]);
+  E('ombroD', 36.5, 58, 7, 7); E('ombroE', 83.5, 58, 7, 7);
+  const bracoD = 'M30.5 61 Q26.5 63 25.5 73 L19 116 L26.5 117.5 L33.5 79 Q36 67 30.5 61Z';
+  Pth('bracoD', bracoD, [27.5, 88]); Pth('bracoE', espelhaD(bracoD), [92.5, 88]);
+  E('maoD', 22, 124, 5.2, 6.6); E('maoE', 98, 124, 5.2, 6.6);
+  // dedos: polegar para fora; indicador→mínimo indo para dentro
+  const DX = [14.6, 17.6, 20.8, 24, 26.8], DY = [125, 133.5, 134.5, 133.5, 132], DL = [3.4, 3.9, 4.3, 3.9, 3.2];
+  for (let k = 0; k < 5; k++) { GEO[`dedo${k + 1}D`] = { t: 'e', cx: DX[k], cy: DY[k], rx: 1.25, ry: DL[k], rot: k === 0 ? 35 : (k - 2) * -4, c: [DX[k], DY[k]] };
+    GEO[`dedo${k + 1}E`] = { t: 'e', cx: 120 - DX[k], cy: DY[k], rx: 1.25, ry: DL[k], rot: k === 0 ? -35 : (k - 2) * 4, c: [120 - DX[k], DY[k]] }; }
+  const pernaD = 'M41.5 117 Q50 121 59 120 L57.5 158 Q57.5 162 56.5 166 L55 196 L46.5 196 L45.5 166 Q43 160 43.5 156Z';
+  Pth('pernaD', pernaD, [50.5, 152]); Pth('pernaE', espelhaD(pernaD), [69.5, 152]);
+  E('peD', 49.5, 201.5, 7, 4.2); E('peE', 70.5, 201.5, 7, 4.2);
+  const TX = [55, 52.2, 49.8, 47.5, 45.3], TR = [1.9, 1.5, 1.4, 1.3, 1.15];
+  for (let k = 0; k < 5; k++) { GEO[`artelho${k + 1}D`] = { t: 'e', cx: TX[k], cy: 207, rx: TR[k], ry: TR[k] * 1.25, rot: 0, c: [TX[k], 207] };
+    GEO[`artelho${k + 1}E`] = { t: 'e', cx: 120 - TX[k], cy: 207, rx: TR[k], ry: TR[k] * 1.25, rot: 0, c: [120 - TX[k], 207] }; }
+  // dentro do torso
+  E('costelas', 60, 72, 19, 17); GEO.coluna = { t: 'r', x: 58.4, y: 50, w: 3.2, h: 66, c: [60, 108] };
+  Pth('claviculaD', 'M43 52.5 Q51 50 58.5 53.5 L58 56 Q50.5 53 43.5 55.5Z', [50, 53.5]); Pth('claviculaE', espelhaD('M43 52.5 Q51 50 58.5 53.5 L58 56 Q50.5 53 43.5 55.5Z'), [70, 53.5]);
+  Pth('pulmaoD', 'M57.5 57 Q46 55 44.5 66 L43.5 82 Q50 86.5 57 82.5 Q58.5 70 57.5 57Z', [51, 70]);
+  Pth('pulmaoE', 'M62.5 57 Q74 55 75.5 66 L76.5 82 Q70.5 86.5 67 83 Q69 76 63.5 74 Q62 66 62.5 57Z', [71, 69]);
+  Pth('coracao', 'M64 66.5 C61 62.5 55.5 64.5 57 69.5 C58 73 62 76 65 78.5 C68.5 75 72 71.5 71.5 68 C71 63.5 66 63 64 66.5Z', [64.3, 70.5]);
+  Pth('figado', 'M43.5 85 Q55 80.5 70 85.5 Q66 90.5 56 91.5 Q47 93 43.5 89Z', [53, 87.5]);
+  Pth('estomago', 'M66 87 Q76 84 77 91 Q77.5 98 70 98 Q66.5 97.5 65 93 Q64 89 66 87Z', [71, 92]);
+  E('rimD', 45.6, 96.5, 2.7, 4.4); E('rimE', 74.4, 96.5, 2.7, 4.4);
+  Pth('intestinos', 'M48 97.5 Q60 94.5 72 97.5 Q76 104 72.5 110 Q60 115 47.5 110 Q44 104 48 97.5Z', [60, 104]);
+})();
+const ORDEM_CAMADA = {
+  esqueleto: ['quadril', 'costelas', 'coluna', 'claviculaD', 'claviculaE', 'cranio', 'mandibula', 'pescoco', 'ombroD', 'ombroE', 'bracoD', 'bracoE', 'maoD', 'maoE', 'pernaD', 'pernaE', 'peD', 'peE'],
+  musculos: ['torso', 'quadril', 'pescoco', 'cabeca', 'ombroD', 'ombroE', 'bracoD', 'bracoE', 'maoD', 'maoE', 'pernaD', 'pernaE', 'peD', 'peE'],
+  orgaos: ['cerebro', 'olhoD', 'olhoE', 'figado', 'estomago', 'rimD', 'rimE', 'intestinos', 'pulmaoD', 'pulmaoE', 'coracao'],
+  pele: ['torso', 'quadril', 'pescoco', 'cabeca', 'orelhaD', 'orelhaE', 'nariz', 'mandibula', 'olhoD', 'olhoE', 'ombroD', 'ombroE', 'bracoD', 'bracoE', 'maoD', 'maoE', 'pernaD', 'pernaE', 'peD', 'peE'],
+};
+for (const k of ['esqueleto', 'musculos', 'pele']) for (let d = 1; d <= 5; d++) ORDEM_CAMADA[k].push(`dedo${d}D`, `dedo${d}E`, `artelho${d}D`, `artelho${d}E`);
+function formaSvg(id, attrs, dentro) {
+  const g = GEO[id]; if (!g) return '';
+  const fecha = t => dentro ? `>${dentro}</${t}>` : '/>';
+  if (g.t === 'e') return `<ellipse cx="${g.cx}" cy="${g.cy}" rx="${g.rx}" ry="${g.ry}"${g.rot ? ` transform="rotate(${g.rot} ${g.cx} ${g.cy})"` : ''} ${attrs}${fecha('ellipse')}`;
+  if (g.t === 'r') return `<rect x="${g.x}" y="${g.y}" width="${g.w}" height="${g.h}" rx="1.4" ${attrs}${fecha('rect')}`;
+  return `<path d="${g.d}" ${attrs}${fecha('path')}`;
+}
+const OSSO = '#ebe4d1', OSSO_S = '#3a332a';
+const mx = x => (120 - x); // espelho
+function decorEsqueleto(tem) {
+  let h = '';
+  const L = (d, w = 2.4, cor = OSSO) => `<path d="${d}" fill="none" stroke="${OSSO_S}" stroke-width="${w + 1.3}" stroke-linecap="round" stroke-linejoin="round"/><path d="${d}" fill="none" stroke="${cor}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>`;
+  const F = (el) => el.replace('/>', ` fill="${OSSO}" stroke="${OSSO_S}" stroke-width="1"/>`);
+  if (tem('coluna')) for (let y = 51; y < 116; y += 4.1) h += `<rect x="57.6" y="${y.toFixed(1)}" width="4.8" height="3.2" rx="1.2" fill="${OSSO}" stroke="${OSSO_S}" stroke-width=".8"/>`;
+  if (tem('pescoco')) for (let y = 39.5; y < 51; y += 3) h += `<rect x="58" y="${y}" width="4" height="2.3" rx="1" fill="${OSSO}" stroke="${OSSO_S}" stroke-width=".7"/>`;
+  if (tem('costelas')) {
+    for (let k = 0; k < 7; k++) { const y = 58 + k * 4.4, w = 16 + Math.sin((k + 1) / 8 * Math.PI) * 4;
+      h += L(`M58 ${y} Q${60 - w} ${y - 2} ${60 - w + 1} ${y + 5}`, 1.5) + L(`M62 ${y} Q${60 + w} ${y - 2} ${60 + w - 1} ${y + 5}`, 1.5); }
+    h += `<rect x="57.8" y="55.5" width="4.4" height="25" rx="2" fill="${OSSO}" stroke="${OSSO_S}" stroke-width=".9"/>`;
+  }
+  if (tem('claviculaD')) h += L('M44 54 Q51 51.5 58 54.5', 2); if (tem('claviculaE')) h += L('M76 54 Q69 51.5 62 54.5', 2);
+  if (tem('quadril')) h += `<path d="M44 104 Q38.5 112 47.5 119 Q55 116 60 122.5 Q65 116 72.5 119 Q81.5 112 76 104 Q68 109 60 107 Q52 109 44 104Z" fill="${OSSO}" stroke="${OSSO_S}" stroke-width="1"/>
+    <ellipse cx="51.5" cy="114.5" rx="2.6" ry="2" fill="#15181b"/><ellipse cx="68.5" cy="114.5" rx="2.6" ry="2" fill="#15181b"/><path d="M57 106.5 L63 106.5 L60 115Z" fill="#d9d0b8" stroke="${OSSO_S}" stroke-width=".7"/>`;
+  if (tem('cranio')) {
+    h += `<path d="M47.5 21 Q46 6.5 60 6 Q74 6.5 72.5 21 Q72 29 67.5 31 L52.5 31 Q48 29 47.5 21Z" fill="${OSSO}" stroke="${OSSO_S}" stroke-width="1.1"/>
+      <path d="M51 14 Q60 10 69 14" fill="none" stroke="#cfc5ab" stroke-width=".7"/>
+      <ellipse cx="54.6" cy="23.5" rx="3.3" ry="3.6" fill="#15181b"/><ellipse cx="65.4" cy="23.5" rx="3.3" ry="3.6" fill="#15181b"/>
+      <path d="M60 26.5 L58.2 30.2 L61.8 30.2Z" fill="#15181b"/><path d="M48.5 24 Q50 27 53 28 M71.5 24 Q70 27 67 28" stroke="#cfc5ab" stroke-width=".8" fill="none"/>`;
+    for (let k = 0; k < 6; k++) h += `<rect x="${54.3 + k * 1.95}" y="31" width="1.6" height="2.4" rx=".4" fill="#f6f1e2" stroke="${OSSO_S}" stroke-width=".4"/>`;
+  }
+  if (tem('mandibula')) { h += `<path d="M50 31.5 Q51.5 40.5 60 41.5 Q68.5 40.5 70 31.5 L67.5 33 Q66 38.5 60 38.6 Q54 38.5 52.5 33Z" fill="${OSSO}" stroke="${OSSO_S}" stroke-width="1"/>`;
+    for (let k = 0; k < 6; k++) h += `<rect x="${54.3 + k * 1.95}" y="34" width="1.6" height="2.2" rx=".4" fill="#f6f1e2" stroke="${OSSO_S}" stroke-width=".4"/>`; }
+  for (const [sd, s] of [['D', 1], ['E', -1]]) {
+    const X = x => s > 0 ? x : mx(x);
+    if (tem('ombro' + sd)) h += `<circle cx="${X(36)}" cy="58" r="3.4" fill="${OSSO}" stroke="${OSSO_S}" stroke-width="1"/><path d="M${X(39)} 55 Q${X(44)} 62 ${X(41)} 72" fill="none" stroke="#cfc5ab" stroke-width="1.6"/>`;
+    if (tem('braco' + sd)) h += L(`M${X(35)} 60 L${X(29.3)} 89`, 3.1) + `<circle cx="${X(29.2)}" cy="89.5" r="2.3" fill="${OSSO}" stroke="${OSSO_S}" stroke-width=".8"/>` + L(`M${X(28)} 91.5 L${X(21.6)} 116`, 1.6) + L(`M${X(30.8)} 91.5 L${X(25)} 116.5`, 1.8);
+    if (tem('mao' + sd)) { h += `<ellipse cx="${X(22.6)}" cy="120.5" rx="3.6" ry="2" fill="${OSSO}" stroke="${OSSO_S}" stroke-width=".7"/>`;
+      for (let k = 1; k <= 5; k++) { const g = GEO[`dedo${k}${sd}`]; h += L(`M${X(22.6)} 121.5 L${(g.cx + (k === 1 ? 2.5 * s : 0)).toFixed(1)} ${(g.cy - g.ry + (k === 1 ? 1.5 : 1)).toFixed(1)}`, 0.9);
+        if (tem(`dedo${k}${sd}`)) { const a = (g.rot || 0) * Math.PI / 180, ux = -Math.sin(a), uy = Math.cos(a); for (let j = 0; j < (k === 1 ? 2 : 3); j++) { const t0 = -g.ry + j * g.ry * 2 / (k === 1 ? 2 : 3) + 0.4, t1 = t0 + g.ry * 2 / (k === 1 ? 2 : 3) - 0.8;
+          h += L(`M${(g.cx + ux * t0).toFixed(2)} ${(g.cy + uy * t0).toFixed(2)} L${(g.cx + ux * t1).toFixed(2)} ${(g.cy + uy * t1).toFixed(2)}`, 1.1); } } } }
+    if (tem('perna' + sd)) h += `<circle cx="${X(53.5)}" cy="119" r="2.6" fill="${OSSO}" stroke="${OSSO_S}" stroke-width=".9"/>` + L(`M${X(53)} 120 L${X(50.5)} 156`, 3.6) + `<ellipse cx="${X(50.6)}" cy="159" rx="2.4" ry="2.1" fill="${OSSO}" stroke="${OSSO_S}" stroke-width=".8"/>` + L(`M${X(49.8)} 162 L${X(50)} 195`, 2.6) + L(`M${X(53.6)} 163 L${X(53)} 194`, 1.2);
+    if (tem('pe' + sd)) { h += `<ellipse cx="${X(50.5)}" cy="198.5" rx="3.4" ry="2" fill="${OSSO}" stroke="${OSSO_S}" stroke-width=".7"/>`;
+      for (let k = 1; k <= 5; k++) { const g = GEO[`artelho${k}${sd}`]; h += L(`M${X(50.5)} 199.5 L${g.cx.toFixed(1)} ${(g.cy - 1.8).toFixed(1)}`, 0.95); if (tem(`artelho${k}${sd}`)) h += `<ellipse cx="${g.cx}" cy="${g.cy}" rx="${(g.rx * 0.6).toFixed(2)}" ry="${(g.ry * 0.8).toFixed(2)}" fill="${OSSO}" stroke="${OSSO_S}" stroke-width=".5"/>`; } }
+  }
+  return h;
+}
+const MUSC = '#b64a40', MUSC_E = '#8d3129', FIB = 'rgba(255,205,190,.38)';
+function decorMusculos(tem, c) {
+  let h = '';
+  const M = (d, cor = MUSC) => `<path d="${d}" fill="${cor}" stroke="#4a1410" stroke-width=".8"/>`;
+  const fib = d => `<path d="${d}" fill="none" stroke="${FIB}" stroke-width=".55"/>`;
+  if (tem('cabeca')) h += `<ellipse cx="60" cy="23" rx="13.6" ry="16.6" fill="#a8463c" stroke="#4a1410" stroke-width=".9"/>` + M('M48 15 Q52 8 60 7.5 Q68 8 72 15 Q66 12 60 12.5 Q54 12 48 15Z', '#c46a5c') +
+    `<ellipse cx="54.5" cy="24" rx="4.3" ry="3.4" fill="none" stroke="#d58474" stroke-width="1.4"/><ellipse cx="65.5" cy="24" rx="4.3" ry="3.4" fill="none" stroke="#d58474" stroke-width="1.4"/>` +
+    M('M49 28 Q52 36 56 37 L55 31Z', '#9a3a31') + M('M71 28 Q68 36 64 37 L65 31Z', '#9a3a31') + `<ellipse cx="60" cy="35.5" rx="4.4" ry="2" fill="#c66b5f" stroke="#4a1410" stroke-width=".5"/>` + (tem('olhoD') ? `<circle cx="54.5" cy="24" r="2.3" fill="#f2efe6"/><circle cx="54.5" cy="24" r="1" fill="#3a2a20"/>` : '') + (tem('olhoE') ? `<circle cx="65.5" cy="24" r="2.3" fill="#f2efe6"/><circle cx="65.5" cy="24" r="1" fill="#3a2a20"/>` : '');
+  if (tem('pescoco')) h += M('M53.5 39 L66.5 39 L67.5 51 L52.5 51Z', MUSC_E) + M('M54 39.5 L59 51 L56 51 L53 41Z', '#c25a4e') + M('M66 39.5 L61 51 L64 51 L67 41Z', '#c25a4e');
+  if (tem('torso')) {
+    h += M('M41 52 Q60 47 79 52 Q86 56 84 67 L78 101 Q60 105 42 101 L36 67 Q34 56 41 52Z', MUSC_E);
+    h += M('M59 54 Q47 52 41 59 Q40 68 45 71 Q53 72 59 68Z') + M('M61 54 Q73 52 79 59 Q80 68 75 71 Q67 72 61 68Z') + fib('M58 57 Q48 58 43 64 M58 62 Q50 63 45 68 M62 57 Q72 58 77 64 M62 62 Q70 63 75 68');
+    for (let k = 0; k < 3; k++) { const y = 73 + k * 8; h += `<rect x="52.6" y="${y}" width="6.8" height="7" rx="2" fill="${MUSC}" stroke="#4a1410" stroke-width=".7"/><rect x="60.6" y="${y}" width="6.8" height="7" rx="2" fill="${MUSC}" stroke="#4a1410" stroke-width=".7"/>`; }
+    h += M('M44 72 Q49 86 51 100 L45 99 Q40 86 41 73Z', '#a63e35') + M('M76 72 Q71 86 69 100 L75 99 Q80 86 79 73Z', '#a63e35') + fib('M43 76 L50 78 M43 82 L50 84 M44 88 L50 90 M77 76 L70 78 M77 82 L70 84 M76 88 L70 90');
+  }
+  if (tem('quadril')) h += M('M42 101 Q60 105 78 101 L82 119 Q60 125 38 119Z', '#9e3a32') + fib('M45 108 Q60 112 75 108 M44 114 Q60 118 76 114');
+  for (const [sd, s] of [['D', 1], ['E', -1]]) {
+    const X = x => s > 0 ? x : mx(x), XD = d => s > 0 ? d : d.replace(/(-?\d+(?:\.\d+)?)[ ,](-?\d+(?:\.\d+)?)/g, (m, x, y) => `${(120 - parseFloat(x)).toFixed(1)} ${y}`);
+    if (tem('ombro' + sd)) h += `<ellipse cx="${X(36.5)}" cy="59" rx="7" ry="8" fill="#c0564b" stroke="#4a1410" stroke-width=".8"/>` + fib(XD('M33 54 L35 66 M37 53 L37.5 67 M40.5 55 L39.5 66'));
+    if (tem('braco' + sd)) h += M(XD('M30.5 63 Q26.5 64 25.5 73 L19 116 L26.5 117.5 L33.5 79 Q36 67 30.5 63Z'), MUSC_E) + M(XD('M31 64 Q26 70 26.5 80 Q28.5 87 31 86 Q34 78 33.5 70Z')) + M(XD('M26.5 92 Q22.5 100 20.5 113 L24.5 113.5 Q27.5 102 29.5 92Z'), '#bb5146') + fib(XD('M29 68 L28.5 84 M31.5 68 L31 84 M25 96 L22 111 M27.5 95 L24.5 111'));
+    if (tem('mao' + sd)) { h += `<ellipse cx="${X(22)}" cy="124" rx="5.2" ry="6.6" fill="#b85044" stroke="#4a1410" stroke-width=".8"/><ellipse cx="${X(19.5)}" cy="124" rx="2.2" ry="3.4" fill="#cf6f61"/>`;
+      for (let k = 1; k <= 5; k++) if (tem(`dedo${k}${sd}`)) h += formaSvg(`dedo${k}${sd}`, 'fill="#c35c50" stroke="#4a1410" stroke-width=".6"'); }
+    if (tem('perna' + sd)) h += M(XD('M41.5 117 Q50 121 59 120 L57.5 158 Q57.5 162 56.5 166 L55 196 L46.5 196 L45.5 166 Q43 160 43.5 156Z'), MUSC_E) +
+      M(XD('M44 121 Q41.5 140 46 155 L50 156 Q48 138 49 122Z'), '#c0564b') + M(XD('M50.5 122 Q49.5 140 51 156 L55.5 156 Q57.5 140 57.5 121Z')) +
+      `<ellipse cx="${X(50.6)}" cy="159.5" rx="3" ry="2.6" fill="#e0b3a0" stroke="#4a1410" stroke-width=".6"/>` + M(XD('M46 166 Q44.5 178 47.5 190 L50 190 Q49 177 50 165Z'), '#c0564b') + M(XD('M51 165 Q55.5 175 54 190 L51.5 190 Q51 177 51 165Z')) + fib(XD('M46 126 L47.5 152 M53 126 L53 152 M47 170 L48.5 186 M52.5 170 L52 186'));
+    if (tem('pe' + sd)) { h += formaSvg('pe' + sd, `fill="#a8463c" stroke="#4a1410" stroke-width=".8"`) + fib(XD('M46 200 L53 203 M46 202.5 L52 205'));
+      for (let k = 1; k <= 5; k++) if (tem(`artelho${k}${sd}`)) h += formaSvg(`artelho${k}${sd}`, 'fill="#c05a4e" stroke="#4a1410" stroke-width=".5"'); }
+  }
+  return h;
+}
+function silhueta(tem, fill, stroke) { let h = ''; for (const id of ORDEM_CAMADA.pele) if (tem(id) && !['olhoD', 'olhoE', 'nariz', 'mandibula'].includes(id)) h += formaSvg(id, `fill="${fill}" stroke="${stroke}" stroke-width=".7"`); return h; }
+function decorOrgaos(tem) {
+  let h = silhueta(tem, 'rgba(255,240,225,.07)', 'rgba(255,240,225,.28)');
+  if (tem('cabeca')) h += `<ellipse cx="60" cy="19" rx="12.5" ry="13" fill="rgba(240,230,210,.08)" stroke="rgba(240,230,210,.3)" stroke-width=".6" stroke-dasharray="1.5 1"/>`;
+  if (tem('cerebro')) h += `<path d="${GEO.cerebro.d}" fill="#e7a3ad" stroke="#6b2a35" stroke-width=".9"/><path d="M60 7 V24.5" stroke="#b56877" stroke-width=".8"/><path d="M51 13 Q54 11 56 14 Q57 17 54 18 Q52 20 55 22 M69 13 Q66 11 64 14 Q63 17 66 18 Q68 20 65 22 M52 9.5 Q55 8.5 57.5 10 M68 9.5 Q65 8.5 62.5 10" fill="none" stroke="#b56877" stroke-width=".7"/>`;
+  for (const sd of ['D', 'E']) if (tem('olho' + sd)) { const g = GEO['olho' + sd]; h += `<ellipse cx="${g.cx}" cy="${g.cy}" rx="3" ry="2.6" fill="#f4f1ea" stroke="#3a2a20" stroke-width=".6"/><circle cx="${g.cx}" cy="${g.cy}" r="1.3" fill="#4d7a9a"/><circle cx="${g.cx}" cy="${g.cy}" r=".6" fill="#111"/>`; }
+  if (tem('pescoco')) h += `<rect x="58.3" y="39" width="3.4" height="18" rx="1.6" fill="#e9c9b9" stroke="#6b4a3c" stroke-width=".6"/>` + [42, 45, 48, 51, 54].map(y => `<path d="M58.3 ${y} H61.7" stroke="#b9978a" stroke-width=".5"/>`).join('');
+  if (tem('torso')) h += `<path d="M38 84 Q60 77 82 84" fill="none" stroke="rgba(255,220,200,.35)" stroke-width=".8" stroke-dasharray="2 1"/>`; // diafragma
+  if (tem('intestinos')) h += `<path d="${GEO.intestinos.d}" fill="#d9b28a" stroke="#6b4a2a" stroke-width=".9"/><path d="M49 99.5 Q60 97 71 99.5 Q73.5 104 71 108.5 Q60 112 49 108.5 Q46.5 104 49 99.5Z" fill="none" stroke="#b08458" stroke-width="1.6"/>` +
+    [[54, 102], [60, 101.5], [66, 102], [57, 106.5], [63, 106.5]].map(([x, y]) => `<path d="M${x - 2.4} ${y} q1.2 -2 2.4 0 t2.4 0" fill="none" stroke="#9b7046" stroke-width=".7"/>`).join('');
+  for (const sd of ['D', 'E']) if (tem('rim' + sd)) { const g = GEO['rim' + sd]; h += `<ellipse cx="${g.cx}" cy="${g.cy}" rx="${g.rx}" ry="${g.ry}" fill="#9b3f3a" stroke="#401412" stroke-width=".7"/><path d="M${g.cx + (sd === 'D' ? 1.3 : -1.3)} ${g.cy - 1.5} q${sd === 'D' ? -1.2 : 1.2} 1.5 0 3" fill="none" stroke="#e0a090" stroke-width=".6"/>`; }
+  if (tem('figado')) h += `<path d="${GEO.figado.d}" fill="#8a3326" stroke="#3a120c" stroke-width=".9"/><path d="M47 86.5 Q55 84 63 86.5" fill="none" stroke="#b5574a" stroke-width=".6"/><ellipse cx="57.5" cy="90" rx="2" ry="1.3" fill="#6f8f3a" stroke="#2f3a12" stroke-width=".4"/>`;
+  if (tem('estomago')) h += `<path d="${GEO.estomago.d}" fill="#e39b84" stroke="#6b3328" stroke-width=".9"/><path d="M67 89.5 Q73 88 75 92.5 Q74.5 96 70.5 96.3" fill="none" stroke="#c07a64" stroke-width=".6"/>`;
+  for (const sd of ['D', 'E']) if (tem('pulmao' + sd)) h += `<path d="${GEO['pulmao' + sd].d}" fill="#e8a29b" stroke="#6b3330" stroke-width=".9"/>` + (sd === 'D' ? '<path d="M59 58 L55 64 L51 70 M55 64 L49 66 M53 67 L52 76" fill="none" stroke="#c06f68" stroke-width=".7"/>' : '<path d="M61 58 L65 64 L69 70 M65 64 L71 66 M68 69 L71 77" fill="none" stroke="#c06f68" stroke-width=".7"/>') +
+    `<path d="M${sd === 'D' ? 47 : 73} 64 Q${sd === 'D' ? 46 : 74} 70 ${sd === 'D' ? 47 : 73} 76" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="1"/>`;
+  if (tem('coracao')) h += `<path d="M62 64 Q61 58 64.5 56.5 Q68.5 56 69 60" fill="none" stroke="#3a120c" stroke-width="2.6"/><path d="M62 64 Q61 58 64.5 56.5 Q68.5 56 69 60" fill="none" stroke="#c43a3a" stroke-width="1.6"/>` +
+    `<path d="${GEO.coracao.d}" fill="#c8302e" stroke="#3a0c0c" stroke-width=".9"/><path d="M59.5 67 Q62 70 66 75" fill="none" stroke="#7f1717" stroke-width=".6"/><ellipse cx="60.5" cy="67.5" rx="1.4" ry="1" fill="rgba(255,255,255,.4)"/>`;
+  return h;
+}
+function decorPele(tem, c, roupa) {
+  const pele = c.pele || '#e3b48a', cab = c.cabelo || '#5a3a1c';
+  let h = `<defs><linearGradient id="sombraPele" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity=".18"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".22"/></linearGradient></defs>`;
+  for (const id of ORDEM_CAMADA.pele) if (tem(id) && !['olhoD', 'olhoE', 'nariz', 'mandibula'].includes(id)) h += formaSvg(id, `fill="${pele}" stroke="#2a1d12" stroke-width=".9"`);
+  for (const id of ['torso', 'quadril', 'bracoD', 'bracoE', 'pernaD', 'pernaE', 'cabeca']) if (tem(id)) h += formaSvg(id, 'fill="url(#sombraPele)" stroke="none"');
+  if (tem('cabeca')) {
+    h += `<path d="M46 20 Q45 5 60 4.5 Q75 5 74 20 Q72 12 60 11.5 Q49 12 46 20Z" fill="${cab}" stroke="#1a120c" stroke-width=".8"/>`;
+    if (c.estilo === 'longo') h += `<path d="M46 18 Q43 32 46 44 L49 40 Q47 30 48 20Z M74 18 Q77 32 74 44 L71 40 Q73 30 72 20Z" fill="${cab}" stroke="#1a120c" stroke-width=".7"/>`;
+    if (c.estilo === 'coque') h += `<circle cx="60" cy="4" r="4.4" fill="${cab}" stroke="#1a120c" stroke-width=".8"/>`;
+    h += `<path d="M51.5 20 Q54.5 18.6 57.5 20 M62.5 20 Q65.5 18.6 68.5 20" fill="none" stroke="${cab}" stroke-width="1.1" stroke-linecap="round"/>`;
+    for (const sd of ['D', 'E']) if (tem('olho' + sd)) { const g = GEO['olho' + sd]; h += `<ellipse cx="${g.cx}" cy="${g.cy}" rx="2.5" ry="1.7" fill="#fff" stroke="#2a1d12" stroke-width=".5"/><circle cx="${g.cx}" cy="${g.cy}" r="1.1" fill="#3b2a1e"/>`; }
+      else { const g = GEO['olho' + sd]; h += `<path d="M${g.cx - 2.6} ${g.cy} Q${g.cx} ${g.cy + 1.6} ${g.cx + 2.6} ${g.cy}" fill="none" stroke="#6a3a2a" stroke-width="1"/>`; }
+    if (tem('nariz')) h += `<path d="M60 25 Q58 30.5 57.5 31.5 Q60 33 62.5 31.5" fill="none" stroke="#7a4a30" stroke-width=".8"/>`;
+    if (tem('mandibula')) h += `<path d="M56 36 Q60 38.2 64 36" fill="none" stroke="#7a3a2a" stroke-width=".9" stroke-linecap="round"/>` + (c.barba ? `<path d="M48.5 30 Q50 42 60 43 Q70 42 71.5 30 Q68 37 60 37.5 Q52 37 48.5 30Z" fill="${cab}" opacity=".9"/>` : '');
+    else h += `<path d="M52 36 Q60 40 68 36" fill="none" stroke="#8a1a1a" stroke-width="1.4"/>`;
+  }
+  for (const [sd] of [['D'], ['E']]) if (tem('mao' + sd)) for (let k = 1; k <= 5; k++) if (tem(`dedo${k}${sd}`)) { const g = GEO[`dedo${k}${sd}`]; const a = (g.rot || 0) * Math.PI / 180; h += `<ellipse cx="${(g.cx - Math.sin(a) * g.ry * 0.7).toFixed(2)}" cy="${(g.cy + Math.cos(a) * g.ry * 0.7).toFixed(2)}" rx=".8" ry=".9" fill="#f3dccb" opacity=".8"/>`; }
+  // roupa íntima (sempre) e roupa completa (opcional)
+  if (tem('quadril')) h += `<path d="M42.5 102 Q60 106 77.5 102 L80.5 117 Q70 120 62 124 L60 122 L58 124 Q50 120 39.5 117Z" fill="#6b5a48" stroke="#2a1d12" stroke-width=".7"/>`;
+  if (roupa) {
+    const r = c.roupa || '#46698f';
+    if (tem('torso')) h += `<path d="M40 52 Q60 46 80 52 Q87 56 85 67 L79 103 Q60 107 41 103 L35 67 Q33 56 40 52Z" fill="${r}" stroke="#1a140f" stroke-width="1"/><path d="M54 50 L60 58 L66 50" fill="none" stroke="#1a140f" stroke-width=".8"/><path d="M45 70 Q50 74 48 82 M75 70 Q70 74 72 82 M52 94 Q60 97 68 94" fill="none" stroke="rgba(0,0,0,.3)" stroke-width=".8"/><rect x="41" y="98" width="38" height="3.6" rx="1" fill="#3a2a1e"/><rect x="58" y="98.3" width="4" height="3" rx=".6" fill="#c9a640"/>`;
+    for (const sd of ['D', 'E']) { const X = x => sd === 'D' ? x : mx(x);
+      if (tem('ombro' + sd)) h += `<ellipse cx="${X(36.5)}" cy="59" rx="7.6" ry="8" fill="${r}" stroke="#1a140f" stroke-width=".9"/>`;
+      if (tem('braco' + sd)) h += `<path d="M${X(30.5)} 60 Q${X(25.5)} 62 ${X(24.8)} 73 L${X(22.4)} 96 L${X(30.6)} 97.5 L${X(34)} 78 Q${X(36.6)} 66 ${X(30.5)} 60Z" fill="${r}" stroke="#1a140f" stroke-width=".9"/><path d="M${X(27)} 78 Q${X(29.5)} 80 ${X(31.5)} 79 M${X(25.5)} 88 Q${X(28)} 90 ${X(30.5)} 89" fill="none" stroke="rgba(0,0,0,.3)" stroke-width=".7"/>`;
+      if (tem('perna' + sd)) h += `<path d="M${X(41)} 116 Q${X(50)} 121 ${X(59.5)} 120 L${X(58)} 158 L${X(56.4)} 190 L${X(46)} 190 L${X(45)} 166 Q${X(42.5)} 160 ${X(43)} 156Z" fill="#4a3d33" stroke="#1a140f" stroke-width=".9"/><path d="M${X(47)} 157 Q${X(51)} 160 ${X(55)} 157 M${X(52)} 128 L${X(51.5)} 150" fill="none" stroke="rgba(0,0,0,.35)" stroke-width=".7"/>`;
+      if (tem('pe' + sd)) h += `<path d="M${X(45.4)} 189 L${X(56.6)} 189 L${X(57.2)} 199 Q${X(58)} 206 ${X(50)} 206.5 Q${X(42)} 206.5 ${X(42.5)} 201Z" fill="#3b2d22" stroke="#1a120c" stroke-width=".9"/><path d="M${X(44)} 199 H${X(56)}" stroke="#5a4532" stroke-width=".8"/>`;
+    }
+  }
+  return h;
+}
+/* ---------------- marcas de ferimento no diagrama ---------------- */
+function marcaFerida(f, k, n, camada) {
+  const g = GEO[f.parte]; if (!g) return '';
+  const [cx0, cy0] = g.c, j = (k - (n - 1) / 2) * 4.5, cx = cx0 + j, cy = cy0 + ((f.id * 37) % 7 - 3) * 0.6, sv = f.sev;
+  const pe = 'pointer-events="none"';
+  if (f.tipo === 'perda') return '';
+  if (camada === 'esqueleto' && !['fratura', 'trinca'].includes(f.tipo)) return '';
+  if (camada === 'orgaos' && PARTES[f.parte] && PARTES[f.parte].prof !== 'dentro' && !['olhoD', 'olhoE'].includes(f.parte)) return '';
+  let h = '';
+  switch (f.tipo) {
+    case 'fratura': h = `<path d="M${cx - 4} ${cy - 3} L${cx - 1.2} ${cy + 0.8} L${cx + 1} ${cy - 2} L${cx + 4} ${cy + 3}" stroke="#2a0000" stroke-width="2.6" fill="none" ${pe}/><path d="M${cx - 4} ${cy - 3} L${cx - 1.2} ${cy + 0.8} L${cx + 1} ${cy - 2} L${cx + 4} ${cy + 3}" stroke="#ff4a3a" stroke-width="1.5" fill="none" ${pe}/>`; break;
+    case 'trinca': h = `<path d="M${cx - 3} ${cy - 1.5} L${cx - 1} ${cy + 0.5} L${cx + 1} ${cy - 1} L${cx + 3} ${cy + 1}" stroke="#ffb03a" stroke-width="1" fill="none" ${pe}/>`; break;
+    case 'contusao': h = `<ellipse cx="${cx}" cy="${cy}" rx="${2.4 + sv * 3.5}" ry="${1.8 + sv * 2.5}" fill="rgba(90,40,130,${(0.4 + sv * 0.4).toFixed(2)})" ${pe}/><ellipse cx="${cx - 0.6}" cy="${cy - 0.4}" rx="${1 + sv * 1.5}" ry="${0.8 + sv}" fill="rgba(60,90,60,.35)" ${pe}/>`; break;
+    case 'queimadura': h = `<ellipse cx="${cx}" cy="${cy}" rx="${3 + sv * 3}" ry="${2.2 + sv * 2}" fill="rgba(220,90,30,.6)" ${pe}/><ellipse cx="${cx + 0.8}" cy="${cy}" rx="${1.4 + sv}" ry="${1 + sv * 0.6}" fill="rgba(70,30,10,.7)" ${pe}/>`; break;
+    case 'mordida': h = [-2.4, -0.8, 0.8, 2.4].map(o => `<circle cx="${cx + o}" cy="${cy - 1.6}" r=".8" fill="#8a0b0b" ${pe}/><circle cx="${cx + o}" cy="${cy + 1.6}" r=".8" fill="#8a0b0b" ${pe}/>`).join(''); break;
+    case 'arranhao': h = [-1.5, 0, 1.5].map(o => `<path d="M${cx - 3 + o} ${cy - 2.5} L${cx + 2 + o} ${cy + 2.5}" stroke="#b01818" stroke-width=".7" ${pe}/>`).join(''); break;
+    case 'perfuracao': h = `<circle cx="${cx}" cy="${cy}" r="1.4" fill="#4a0000" stroke="#c01818" stroke-width=".8" ${pe}/>`; break;
+    case 'cicatriz': h = `<path d="M${cx - 3} ${cy - 1} Q${cx} ${cy + 1} ${cx + 3} ${cy - 1}" stroke="#f0c0b8" stroke-width="1.1" fill="none" stroke-linecap="round" ${pe}/>`; break;
+    default: h = `<path d="M${cx - 4} ${cy - 2} L${cx + 4} ${cy + 2}" stroke="#4a0000" stroke-width="2.2" stroke-linecap="round" ${pe}/><path d="M${cx - 4} ${cy - 2} L${cx + 4} ${cy + 2}" stroke="#d02020" stroke-width="1.2" stroke-linecap="round" ${pe}/>`;
+  }
+  if (f.sangra > 0 && camada !== 'esqueleto') h += `<path d="M${cx} ${cy + 2} q1.6 2.6 0 4 q-1.6 -1.4 0 -4Z" fill="#c01818" ${pe}/>`;
+  if (f.band) h += `<rect x="${cx - 5}" y="${cy - 1.6}" width="10" height="3.2" rx="1.2" fill="${f.remedio === 'boa' ? '#e9f3e0' : '#f4f1e8'}" stroke="#333" stroke-width=".5" opacity=".92" ${pe}/>${f.remedio === 'boa' ? `<rect x="${cx - 5}" y="${cy - 0.3}" width="10" height=".7" fill="#6f9a3a" ${pe}/>` : ''}`;
+  if (f.tala) h += `<path d="M${cx - 2.4} ${cy - 6} V${cy + 6} M${cx + 2.4} ${cy - 6} V${cy + 6}" stroke="#7a4f2a" stroke-width="1.6" ${pe}/>`;
+  if (f.infec > 0) h += `<circle cx="${cx}" cy="${cy}" r="${4 + f.infec * 3}" fill="rgba(120,180,40,${(0.18 + f.infec * 0.45).toFixed(2)})" ${pe}/>`;
+  return h;
+}
+const corDano = r => r <= 0 ? '#8a8a8a' : r < 0.25 ? '#ff3a2a' : r < 0.5 ? '#ff8a2a' : r < 0.8 ? '#ffd23a' : '#e8f0a0';
+const CAMADAS = [['esqueleto', 'Esqueleto'], ['musculos', 'Músculos'], ['orgaos', 'Órgãos'], ['pele', 'Pele/Corpo']];
+let abaInspecao = 'geral', camadaSaude = 'pele', parteSel = null, verRoupa = true;
+function svgCorpo(c, camada = camadaSaude, larg = 118) {
+  const s = saude(c), tem = id => !faltando(c, id), por = {};
+  for (const f of s.feridas) (por[f.parte] = por[f.parte] || []).push(f);
+  const bg = camada === 'esqueleto' ? '#121518' : camada === 'orgaos' ? '#16131a' : camada === 'musculos' ? '#1a1312' : 'rgba(0,0,0,.28)';
+  let h = `<svg viewBox="0 0 120 214" width="${larg}" height="${Math.round(larg * 214 / 120)}" style="flex:none;background:${bg};border-radius:6px;touch-action:none;border:1px solid rgba(201,162,74,.35)" data-camadasvg="${camada}">`;
+  h += camada === 'esqueleto' ? decorEsqueleto(tem) : camada === 'musculos' ? decorMusculos(tem, c) : camada === 'orgaos' ? decorOrgaos(tem) : decorPele(tem, c, verRoupa);
+  // partes perdidas: contorno tracejado (coto vermelho na parte que foi arrancada)
+  for (const id of s.perdidas) if (ORDEM_CAMADA[camada].includes(id) || (camada === 'pele' && GEO[id])) {
+    const top = s.feridas.some(f => f.parte === id && f.tipo === 'perda');
+    h += formaSvg(id, `fill="rgba(0,0,0,.25)" stroke="${top ? '#ff6a5a' : '#777'}" stroke-width="${top ? 1 : 0.6}" stroke-dasharray="1.6 1.2" pointer-events="none"`);
+  }
+  // áreas clicáveis + destaque das partes feridas
+  for (const id of ORDEM_CAMADA[camada]) {
+    if (!GEO[id]) continue;
+    const fs = (por[id] || []).filter(f => f.tipo !== 'cicatriz'), sel = id === parteSel, falta = faltando(c, id);
+    const r = falta ? 0 : hpAtual(c, id) / hpMax(c, id), fer = fs.length > 0 || falta;
+    const cor = corDano(r);
+    const fill = sel ? 'rgba(255,255,255,.18)' : fer && !falta ? hexA(cor, 0.26) : 'rgba(0,0,0,0)';
+    const stroke = sel ? '#ffffff' : fer ? cor : 'none';
+    const tit = `<title>${PARTES[id].nome}${falta ? ' — perdido(a)' : fer ? ` — ${Math.round(r * 100)}% de vida` : ''}</title>`;
+    h += formaSvg(id, `data-parte="${id}" fill="${fill}" stroke="${stroke}" stroke-width="${sel ? 1.6 : fer ? 1.3 : 0}"${sel ? ' stroke-dasharray="2.5 1.5"' : ''} style="cursor:pointer"`, tit);
+  }
+  for (const id in por) { const l = por[id]; l.forEach((f, k) => { h += marcaFerida(f, k, l.length, camada); }); }
+  return h + '</svg>';
+}
+function hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; }
+const tabsInspecao = () => `<div style="display:flex;gap:4px;margin:-2px 0 4px">${[['geral', 'Geral'], ['saude', 'Saúde']].map(([k, n]) => `<span class="ordem${abaInspecao === k ? ' sel' : ''}" data-insp="${k}" style="padding:2px 9px;margin:0">${n}</span>`).join('')}</div>`;
+const ICONE_FER = { corte: '🔪', mordida: '🦷', arranhao: '〰', contusao: '🟣', queimadura: '🔥', fratura: '🦴', trinca: '🦴', perfuracao: '•', perda: '✖', cicatriz: '〜' };
+function textoFerida(f, c) {
+  const tr = f.tipo === 'cicatriz' ? '' : f.tala ? 'tala' + (f.band ? ' + bandagem' : '') : f.band ? (f.remedio === 'boa' ? 'bandagem boa' : 'bandagem') : f.trat ? 'tratada' : '';
+  const q = f.trat && f.tipo !== 'cicatriz' ? ` ${Math.round(f.trat * 100)}%` : '';
+  const pts = f.tipo === 'perda' ? '' : f.tipo === 'cicatriz' ? '' : ` ${f.dano.toFixed(f.dano < 10 ? 1 : 0)}`;
+  return `${ICONE_FER[f.tipo] || ''} <b>${FERIDA[f.tipo].nome}</b>${pts}` + (f.sangra > 0 ? ` · <span class="neg">sangra ${f.sangra.toFixed(1)}/h</span>` : '') +
+    (f.infec > 0 ? ` · <span style="color:#a8d060">infecção ${Math.round(f.infec * 100)}% × imunidade ${Math.round(f.imune * 100)}%</span>` : '') +
+    (f.tipo === 'cicatriz' ? ' <span style="color:#aaa">(permanente)</span>' : tr ? ` · <span class="pos">${tr}${q}</span>` : f.tipo === 'contusao' && f.sev < 0.3 ? '' : ' · <span class="neg">não tratada</span>');
+}
+function dicaFerida(f) { return `${FERIDA[f.tipo].nome}: dor ${Math.round(FERIDA[f.tipo].dor * (f.tipo === 'perda' ? Math.min(f.dano, 30) : f.dano) * (f.trat ? 1 - 0.5 * f.trat : 1) * 100)}%` + (f.sangra ? `, sangramento ${f.sangra.toFixed(1)}/h` : '') + (f.tratPor ? `, tratada por ${f.tratPor} (${f.remedio === 'boa' ? 'bandagem boa' : f.remedio === 'simples' ? 'bandagem simples' : 'sem remédio'})` : '') + (f.idade ? `, há ${Math.round(f.idade / 60)} h` : ''); }
+function barraCap(rot, v, dica) { const p = Math.round(v * 100), cor = v < 0.3 ? '#e2523e' : v < 0.7 ? '#e0a03a' : v > 1 ? '#7fd0ff' : '#86c05a';
+  return `<div class="capRow" title="${dica || rot}"><span>${rot}</span><b style="color:${cor}">${p}%</b><i><u style="width:${clamp(p, 0, 100)}%;background:${cor}"></u></i></div>`; }
+function listaFerimentos(c) { // só partes feridas / perdidas, agrupadas por parte, na ordem da anatomia
+  const s = saude(c), A = anatDe(c), por = {};
+  for (const f of s.feridas) (por[f.parte] = por[f.parte] || []).push(f);
+  const linhas = [];
+  for (const id of A.ordem) {
+    const fs = por[id]; if (!fs) continue;
+    const P = A.partes[id], perdido = fs.some(f => f.tipo === 'perda');
+    const r = perdido ? 0 : hpAtual(c, id) / P.hp, cor = corDano(r);
+    const sub = perdido ? descendentes(c, id).length : 0;
+    linhas.push(`<div class="parteFer${id === parteSel ? ' sel' : ''}" data-parte="${id}" title="${P.nome} — ${P.prof === 'dentro' ? 'interna' : 'externa'}${P.vital ? ', vital' : ''}${perdido ? '' : `, ${Math.round(hpAtual(c, id))}/${P.hp} HP`}">` +
+      `<div style="color:${cor};font-weight:bold">${P.nome}${perdido ? ` — perdido(a)${sub ? ` (+${sub} parte${sub > 1 ? 's' : ''})` : ''}` : ` <span style="font-weight:normal;color:#999">${Math.round(hpAtual(c, id))}/${P.hp}</span>`}</div>` +
+      fs.map(f => `<div class="ferL" title="${dicaFerida(f)}">${textoFerida(f, c)}</div>`).join('') + '</div>');
+  }
+  return linhas.join('') || '<div style="color:#888">Nenhum ferimento.</div>';
+}
+function detalheParte(c, id) {
+  const A = anatDe(c), P = A.partes[id]; if (!P) return '';
+  const s = saude(c), falta = faltando(c, id), fs = s.feridas.filter(f => f.parte === id);
+  const capN = { consciencia: 'consciência', visao: 'visão', audicao: 'audição', manipulacao: 'manipulação', movimento: 'movimento', respiracao: 'respiração', bombeamento: 'bombeamento', filtragem: 'filtragem do sangue', digestao: 'digestão', fala: 'fala' };
+  const fil = P.filhos.map(f => A.partes[f]).filter(Boolean);
+  return `<div class="detParte"><b style="color:#ffd770">${P.nome}</b> <span data-parte="" style="cursor:pointer;color:#9cf">✕</span><br>` +
+    `${falta ? '<span style="color:#aaa">Parte perdida.</span>' : `Vida ${Math.round(hpAtual(c, id))}/${P.hp} · eficiência ${Math.round(eficiencia(c, id) * 100)}%`}<br>` +
+    `<span class="sub">${P.prof === 'dentro' ? 'Interna' : 'Externa'} · cobertura ${(P.abs * 100).toFixed(P.abs < 0.01 ? 1 : 0)}%${P.vital ? ' · <span style="color:#ff8a7a">vital</span>' : ''}${P.osso ? ' · osso' : ''}${P.cap ? ' · afeta ' + capN[P.cap] : ''}</span>` +
+    (fil.length ? `<div class="sub">Contém: ${fil.map(f => `<span data-parte="${f.id}" style="cursor:pointer;color:${faltando(c, f.id) ? '#888' : '#cfe'}">${f.nome.toLowerCase()}</span>`).join(', ')}</div>` : '') +
+    (fs.length ? fs.map(f => `<div class="ferL" title="${dicaFerida(f)}">${textoFerida(f, c)}</div>`).join('') : '<div style="color:#888">Sem ferimentos aqui.</div>') + '</div>';
+}
+function resumoSaude(c) {
+  const s = saude(c), k = capDe(c), san = taxaSangramento(c), perda = perdaSangue(c), est = ESTAGIO_SANGUE(perda);
+  const morte = san > 0 ? Math.max(0, (100 - perda) / san) : 0;
+  let h = `<div class="capGrid">${CAPS.map(([id, n]) => barraCap(n, k[id])).join('')}</div>`;
+  h += `<div class="sub" style="margin:3px 0">Dor <b style="color:${s.dor >= LIMIAR_CHOQUE ? '#ff5a4a' : s.dor > 0.4 ? '#ffb03a' : '#ddd'}">${Math.round(s.dor * 100)}%</b>${s.choque ? ' <span class="neg">(choque de dor)</span>' : ''} · ` +
+    `Sangramento <b style="color:${san > 8 ? '#ff5a4a' : san > 0 ? '#ffb03a' : '#9c9'}">${san.toFixed(1)}%/h</b>${san > 0 && morte < 48 ? ` <span class="neg">(morre em ~${morte < 1 ? Math.round(morte * 60) + ' min' : Math.round(morte) + ' h'})</span>` : ''}` +
+    ` · Sangue ${Math.round(s.sangue)}%${est ? ` <span class="neg">perda ${est}</span>` : ''}</div>`;
+  const inf = s.feridas.filter(f => f.infec > 0);
+  for (const f of inf) h += `<div class="sub" title="Corrida: se a imunidade chegar a 100% antes da infecção, sara; se a infecção chegar a 100%, morre.">🦠 ${anatDe(c).partes[f.parte].nome}: <span style="display:inline-block;width:60px;height:5px;background:#333;vertical-align:middle"><span style="display:block;height:5px;width:${Math.round(f.infec * 100)}%;background:#8bc34a"></span></span> infecção ${Math.round(f.infec * 100)}% · <span style="display:inline-block;width:60px;height:5px;background:#333;vertical-align:middle"><span style="display:block;height:5px;width:${Math.round(f.imune * 100)}%;background:#6fb6ff"></span></span> imunidade ${Math.round(f.imune * 100)}%</div>`;
+  return h;
+}
+function htmlSaude(c) {
+  const s = saude(c), est = s.caido ? (s.inconsciente ? 'Inconsciente' : s.choque ? 'Caído(a) — choque de dor' : 'Caído(a)') : c.tarefa && c.tarefa.tipo === 'repousar' ? (c.tarefa.camaReal ? 'Repousando na cama médica' : 'Repousando') : s.feridas.length ? 'Ferido(a), de pé' : 'Saudável';
+  return tabsInspecao() + `<h3>${c.nome} <span style="font-size:12px;color:${s.caido ? '#ff8a7a' : '#bbb'}">— ${est}</span></h3>` + resumoSaude(c) +
+    `<div style="margin:5px 0 4px">${CAMADAS.map(([k, n]) => `<span class="ordem${camadaSaude === k ? ' sel' : ''}" data-camada="${k}" style="padding:2px 6px;margin:1px">${n}</span>`).join('')}` +
+    (camadaSaude === 'pele' ? `<span class="ordem${verRoupa ? ' sel' : ''}" data-roupa="1" style="padding:2px 6px;margin:1px">👕</span>` : '') + `<span class="ordem" data-anat="1" style="padding:2px 6px;margin:1px" title="Ver as 4 camadas lado a lado">🔍</span></div>` +
+    `<div style="display:flex;gap:8px;align-items:flex-start">${svgCorpo(c)}<div class="listaFer" style="flex:1;min-width:0;font-size:12px;max-height:240px;overflow:auto">` +
+    (parteSel ? detalheParte(c, parteSel) : '<div class="sub" style="margin:0 0 3px">Toque numa parte do corpo</div>') + listaFerimentos(c) +
+    `<div class="sub" style="margin-top:6px">Médico(a): habilidade ${habMed(c)} · bandagens: ${c.bandagens || 0} simples, ${c.bandBoas || 0} boas${s.examinado ? ' · examinado(a)' : ''}</div></div></div>`;
+}
+function htmlAnatomia(c) {
+  return `<div class="anatTopo"><b>${c.nome} — anatomia</b><span class="ordem" data-anatx="1">✕ Fechar</span></div><div class="anatLinha">` +
+    CAMADAS.map(([k, n]) => `<div class="anatCol"><div class="anatNome">${n}</div>${svgCorpo(c, k, 150)}</div>`).join('') + `</div>` +
+    `<div class="anatDet">${parteSel ? detalheParte(c, parteSel) : '<span class="sub">Toque numa parte em qualquer camada para ver os detalhes.</span>'}</div>`;
+}
+function abrirAnatomia(c) { const d = $('anatDlg'); d.style.display = 'block'; d._c = c; d.innerHTML = htmlAnatomia(c); }
+function htmlSaudeAnimal(a) {
+  const s = saude(a), k = capDe(a);
+  return `<div class="capGrid">${[['consciencia', 'Consciência'], ['movimento', 'Movimento'], ['circulacao', 'Circulação'], ['visao', 'Visão']].map(([id, n]) => barraCap(n, k[id])).join('')}</div>` +
+    `<div class="sub">Dor ${Math.round(s.dor * 100)}% · sangramento ${taxaSangramento(a).toFixed(1)}%/h${s.caido ? ' · <span class="neg">caído</span>' : ''}</div>` +
+    `<div style="font-size:12px;max-height:120px;overflow:auto">${listaFerimentos(a)}</div>`;
+}
+function instalarUI10() {
+  const st = document.createElement('style'); st.textContent = `
+  .capGrid{display:grid;grid-template-columns:1fr 1fr;gap:1px 8px;font-size:11px;margin:3px 0}
+  .capRow{display:grid;grid-template-columns:1fr auto;align-items:center;column-gap:4px}.capRow span{color:#ccc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .capRow i{grid-column:1/3;height:3px;background:rgba(255,255,255,.1);display:block}.capRow i u{display:block;height:3px}
+  .parteFer{margin:2px 0 4px;padding:2px 4px;border-left:2px solid rgba(255,255,255,.12);cursor:pointer}.parteFer.sel{background:rgba(255,255,255,.07);border-left-color:#fff}
+  .ferL{margin-left:4px;color:#ddd}.detParte{margin:0 0 6px;padding:4px 6px;background:rgba(201,162,74,.12);border-radius:4px}
+  #anatDlg{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:30;width:min(680px,97vw);max-height:94dvh;overflow:auto;padding:8px 10px;display:none}
+  .anatTopo{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;color:#ffd770}
+  .anatLinha{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}.anatCol{text-align:center}.anatNome{font-size:12px;color:#ddd;margin-bottom:2px}.anatDet{margin-top:6px;font-size:12px}`;
+  document.head.appendChild(st);
+  if (!$('anatDlg')) { const d = document.createElement('div'); d.id = 'anatDlg'; d.className = 'painel'; document.body.appendChild(d);
+    d.addEventListener('pointerdown', e => { const t = e.target.closest('[data-parte],[data-anatx]'); if (!t) return; e.preventDefault();
+      if (t.dataset.anatx) { d.style.display = 'none'; return; }
+      parteSel = t.dataset.parte && t.dataset.parte !== parteSel ? t.dataset.parte : null; if (d._c) d.innerHTML = htmlAnatomia(d._c); atualizarUI(); }); }
+}
+/* ---------------- animais v10: vista lateral, marcha de quadrúpede (passo / trote / galope) ---------------- */
+const VIS_ANIMAL = {
+  veado: { L: 17, alt: 10, H: 6.4, perna: [1.9, 1.3], marchas: [1.1, 1.6, 2.4] },
+  lobo: { L: 16.5, alt: 7.6, H: 5.6, perna: [2.3, 1.6], marchas: [1.0, 1.5, 2.3] },
+  urso: { L: 23, alt: 7.4, H: 10.5, perna: [4.6, 3.8], marchas: [1.3, 1.8, 2.6] },
+};
+const MARCHA = { // fases das patas [DE, DD, TE, TD], fração de apoio, passo e altura
+  passo: { of: [0.25, 0.75, 0, 0.5], duty: 0.64, S: 5, lift: 2 }, trote: { of: [0, 0.5, 0.5, 0], duty: 0.5, S: 7.5, lift: 2.6 }, galope: { of: [0.46, 0.56, 0, 0.09], duty: 0.38, S: 10.5, lift: 3.4 },
+};
+function ik2(hx, hy, px, py, a, b, dobra) { // joelho de uma perna de 2 segmentos
+  let dx = px - hx, dy = py - hy, d = Math.hypot(dx, dy) || 0.01; const mx_ = a + b - 0.05;
+  if (d > mx_) { px = hx + dx / d * mx_; py = hy + dy / d * mx_; dx = px - hx; dy = py - hy; d = mx_; }
+  const th = Math.atan2(dy, dx), al = Math.acos(clamp((a * a + d * d - b * b) / (2 * a * d), -1, 1)), q = th - dobra * al;
+  return { kx: hx + Math.cos(q) * a, ky: hy + Math.sin(q) * a, px, py };
+}
+function corpoAnimal(g, esp, o) {
+  const V = VIS_ANIMAL[esp], E = ESP_ANIMAL[esp], N = typeof Q !== 'undefined' ? Q.nivel : 2;
+  const morte = o.morte || 0, deit = Math.max(morte, o.deitado || 0), w = deit ? 0 : clamp(o.w || 0, 0, 1.3);
+  const marcha = MARCHA[o.marcha || (o.corre ? 'galope' : 'passo')], F = o.fase || 0, t = o.t || 0;
+  const atk = o.atk || 0, ea = Math.sin(clamp(atk, 0, 1) * Math.PI), pasta = o.pasta || 0, fare = o.fareja || 0;
+  const manca = o.manca, L = V.L, H = V.H, alt = V.alt;
+  g.lineJoin = 'round'; g.lineCap = 'round';
+  // corpo sobe/desce com a marcha; afunda quando apoia a perna machucada
+  let bob = 0, pitch = 0;
+  if (w > 0) { if (o.marcha === 'trote') bob = Math.sin(F * TAU * 2) * 0.9 * w; else if (o.marcha === 'galope') { bob = Math.sin(F * TAU) * 1.6 * w; pitch = Math.sin(F * TAU + 0.6) * 0.1 * w; } else bob = Math.abs(Math.sin(F * TAU * 2)) * 0.45 * w; }
+  const pernas = [{ fr: 1, near: false }, { fr: 1, near: true }, { fr: -1, near: false }, { fr: -1, near: true }].map((p, k) => {
+    const ph = ((F + marcha.of[k]) % 1 + 1) % 1, mk = manca && manca.perna === k ? manca.k : 0;
+    let fx = 0, lift = 0, apoio = true;
+    if (w > 0.02) { const S = marcha.S * Math.min(1, w) * (1 - mk * 0.45);
+      if (ph < marcha.duty) { const u = ph / marcha.duty; fx = S / 2 - u * S; } else { const u = (ph - marcha.duty) / (1 - marcha.duty); fx = -S / 2 + suave(u) * S; lift = Math.sin(u * Math.PI) * marcha.lift * Math.min(1, w + 0.3); apoio = false; } }
+    if (mk > 0.6 || (manca && manca.perna === k && manca.falta)) lift = Math.max(lift, 2.2 + mk); // perna quase sem uso: fica erguida
+    if (apoio && mk > 0) bob += mk * 1.3 * (w > 0.02 ? 1 : 0.4) * 0.5;
+    return { ...p, k, fx, lift, mk, falta: manca && manca.perna === k && manca.falta };
+  });
+  const bx = ea * (esp === 'urso' ? 2 : 4.5); // investida
+  const rearing = esp === 'urso' ? ea * 0.55 : 0;
+  const deitY = deit * alt * 0.92, by = -alt - H * 0.5 + bob + deitY;
+  // sombra
+  elipse(g, bx * 0.6, 0.6, L * 0.62 + deit * 4, 2.6 + deit * 1.2); g.fillStyle = 'rgba(0,0,0,.24)'; g.fill();
+  g.save(); g.translate(bx, 0);
+  if (rearing) { g.translate(-L * 0.33, -alt * 0.3); g.rotate(-rearing); g.translate(L * 0.33, alt * 0.3); }
+  if (morte) g.rotate(-0.08 * morte);
+  const corP = (near) => near ? E.cor : E.escuro;
+  const desenharPerna = p => {
+    const hx = p.fr * L * 0.33 + (p.near ? 0.6 : -0.6), hy = by + H * 0.15;
+    const [lw1, lw2] = V.perna, a = (alt + H * 0.35) * 0.55, b = (alt + H * 0.35) * 0.55;
+    let px, py, kx, ky;
+    if (deit) { // morto/caído: pernas esticadas para o lado
+      const ang = (p.fr > 0 ? -0.35 : 0.35) * (p.near ? 1.2 : 0.8);
+      px = hx + Math.sin(ang) * (a + b) * 0.95 + p.fr * 2; py = hy + Math.cos(ang) * (a + b) * 0.35 + (p.near ? 2.5 : -1.5);
+      kx = (hx + px) / 2; ky = (hy + py) / 2;
+    } else {
+      const R = ik2(hx, hy, hx + p.fx, -p.lift, a, b, p.fr > 0 ? -1 : 1); kx = R.kx; ky = R.ky; px = R.px; py = R.py;
+    }
+    if (p.falta) { px = lerp(hx, kx, 0.7); py = lerp(hy, ky, 0.7); kx = lerp(hx, kx, 0.4); ky = lerp(hy, ky, 0.4); }
+    g.beginPath(); g.moveTo(hx, hy); g.lineTo(kx, ky); g.lineTo(px, py); g.lineWidth = lw1 + 1.5; g.strokeStyle = CONTORNO; g.stroke();
+    g.beginPath(); g.moveTo(hx, hy); g.lineTo(kx, ky); g.lineWidth = lw1; g.strokeStyle = corP(p.near); g.stroke();
+    g.beginPath(); g.moveTo(kx, ky); g.lineTo(px, py); g.lineWidth = lw2; g.strokeStyle = corP(p.near); g.stroke();
+    if (p.falta) { circulo(g, px, py, lw2 * 0.6); g.fillStyle = '#9a1818'; g.fill(); return; }
+    if (esp === 'veado') { g.beginPath(); g.moveTo(px - 1, py - 1.6); g.lineTo(px + 1.4, py - 1.2); g.lineTo(px + 1.2, py + 0.4); g.lineTo(px - 1.1, py + 0.4); g.closePath(); g.fillStyle = '#2a1e14'; g.fill(); }
+    else { elipse(g, px + 0.8, py - 0.4, esp === 'urso' ? 3.2 : 1.8, esp === 'urso' ? 1.7 : 1.1); g.fillStyle = esp === 'urso' ? '#2c1d12' : E.escuro; g.fill(); g.lineWidth = 0.8; g.strokeStyle = CONTORNO; g.stroke();
+      if (esp === 'urso' && (ea > 0.3 || p.near)) { g.beginPath(); for (let j = -1; j <= 1; j++) { g.moveTo(px + 3, py - 0.6 + j * 0.8); g.lineTo(px + 4.4, py - 0.2 + j * 0.9); } g.lineWidth = 0.6; g.strokeStyle = '#e8e2d0'; g.stroke(); } }
+  };
+  for (const p of pernas) if (!p.near) desenharPerna(p);
+  // cauda
+  const cauX = -L * 0.5, cauY = by - H * 0.25;
+  const wag = Math.sin(t * (esp === 'lobo' ? 6 : 3.2)) * (1 - deit) * (esp === 'veado' ? (o.alerta ? 1 : 0.3) : 0.6);
+  g.save(); g.translate(cauX, cauY);
+  if (esp === 'lobo') { g.rotate(0.9 - w * 0.5 + wag * 0.25 - deit * 0.6); g.beginPath(); g.moveTo(0, -1.4); g.quadraticCurveTo(-5, 0, -8.5, 3.5); g.quadraticCurveTo(-6, 1.5, -5.5, 4.5); g.quadraticCurveTo(-3, 2.5, 0, 1.6); g.closePath();
+    g.fillStyle = E.cor; g.fill(); g.lineWidth = 1; g.strokeStyle = CONTORNO; g.stroke(); circulo(g, -7.6, 3.6, 1.1); g.fillStyle = '#2b2b2e'; g.fill(); }
+  else if (esp === 'veado') { g.rotate(-0.6 - wag * 0.5); elipse(g, -1.8, 0, 2.6, 1.4); g.fillStyle = '#f4efe6'; g.fill(); g.lineWidth = 0.8; g.strokeStyle = CONTORNO; g.stroke(); elipse(g, -1.4, -0.7, 2, 0.6); g.fillStyle = E.cor; g.fill(); }
+  else { circulo(g, -0.8, 0, 1.7); g.fillStyle = E.cor; g.fill(); g.lineWidth = 0.8; g.strokeStyle = CONTORNO; g.stroke(); }
+  g.restore();
+  // corpo
+  g.save(); g.translate(0, by); g.rotate(pitch);
+  const corpo = new Path2D();
+  if (esp === 'urso') { corpo.moveTo(-L * 0.5, 1); corpo.bezierCurveTo(-L * 0.55, -H * 0.62, -L * 0.15, -H * 0.62, L * 0.12, -H * 0.72); corpo.bezierCurveTo(L * 0.3, -H * 0.82, L * 0.48, -H * 0.4, L * 0.47, 0); corpo.bezierCurveTo(L * 0.45, H * 0.5, -L * 0.3, H * 0.55, -L * 0.5, 1); }
+  else if (esp === 'lobo') { corpo.moveTo(-L * 0.5, -H * 0.15); corpo.bezierCurveTo(-L * 0.45, -H * 0.62, L * 0.2, -H * 0.66, L * 0.44, -H * 0.42); corpo.bezierCurveTo(L * 0.55, -H * 0.1, L * 0.45, H * 0.55, L * 0.25, H * 0.5); corpo.bezierCurveTo(L * 0.05, H * 0.2, -L * 0.3, H * 0.42, -L * 0.5, -H * 0.15); }
+  else { corpo.moveTo(-L * 0.5, -H * 0.1); corpo.bezierCurveTo(-L * 0.48, -H * 0.6, L * 0.2, -H * 0.58, L * 0.45, -H * 0.38); corpo.bezierCurveTo(L * 0.56, -H * 0.05, L * 0.4, H * 0.55, L * 0.2, H * 0.48); corpo.bezierCurveTo(0, H * 0.38, -L * 0.35, H * 0.45, -L * 0.5, -H * 0.1); }
+  g.fillStyle = E.cor; g.fill(corpo);
+  g.save(); g.clip(corpo);
+  if (N === 2) { const gr = g.createLinearGradient(0, -H * 0.7, 0, H * 0.6); gr.addColorStop(0, 'rgba(255,255,255,.14)'); gr.addColorStop(0.55, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,.25)'); g.fillStyle = gr; g.fillRect(-L, -H, L * 2, H * 2); }
+  elipse(g, 0, H * 0.55, L * 0.42, H * 0.32); g.fillStyle = esp === 'urso' ? 'rgba(0,0,0,.18)' : E.claro; g.globalAlpha = esp === 'urso' ? 1 : 0.85; g.fill(); g.globalAlpha = 1;
+  if (esp === 'veado') { elipse(g, -L * 0.47, -H * 0.05, 2.6, 3.2); g.fillStyle = '#f4efe6'; g.fill(); if (!o.chifre) for (const [sx, sy] of [[-3.5, -2.4], [-0.5, -3], [2.5, -2.6], [-2, -1], [1, -1.4]]) { circulo(g, sx, sy, 0.6); g.fillStyle = 'rgba(255,245,225,.6)'; g.fill(); } }
+  if (esp === 'lobo') { elipse(g, -1.5, -H * 0.5, L * 0.33, H * 0.3); g.fillStyle = E.escuro; g.fill(); }
+  if (esp === 'urso') { elipse(g, L * 0.15, -H * 0.62, L * 0.2, H * 0.22); g.fillStyle = 'rgba(255,255,255,.08)'; g.fill(); }
+  if (N > 0) { g.beginPath(); const n = esp === 'urso' ? 9 : 6; for (let k = 0; k < n; k++) { const x = -L * 0.4 + k * L * 0.8 / n, y = -H * 0.25 + Math.sin(k * 2.1) * H * 0.2; g.moveTo(x, y); g.lineTo(x - 1.6, y + 1.4); } g.lineWidth = 0.6; g.strokeStyle = 'rgba(0,0,0,.2)'; g.stroke(); }
+  g.restore();
+  g.lineWidth = 1.4; g.strokeStyle = CONTORNO; g.stroke(corpo);
+  if (esp === 'lobo' && N > 0) { g.beginPath(); for (let k = 0; k < 7; k++) { const x = -L * 0.38 + k * L * 0.11, y = -H * 0.58 + Math.abs(k - 3) * 0.2; g.moveTo(x, y); g.lineTo(x + 1, y - 1.3); g.lineTo(x + 2, y); } g.fillStyle = E.cor; g.fill(); g.lineWidth = 0.8; g.stroke(); }
+  if (o.flash) { g.fillStyle = `rgba(255,255,255,${Math.min(0.8, o.flash)})`; g.fill(corpo); }
+  g.restore();
+  // pescoço e cabeça (pastar abaixa até o chão; farejar balança perto do chão; ataque estica)
+  const baixa = Math.max(pasta, fare * 0.75) * (1 - deit);
+  const nx0 = L * 0.38, ny0 = by - H * 0.35;
+  const cab = esp === 'veado' ? { x: L * 0.5 + 4, y: by - H - 6 } : esp === 'lobo' ? { x: L * 0.5 + 3.5, y: by - H * 0.75 } : { x: L * 0.5 + 2.5, y: by - H * 0.4 };
+  let hx = lerp(cab.x, L * 0.5 + 5, baixa) + ea * 3 + Math.sin(t * 2.3) * fare * 1.2, hy = lerp(cab.y, -2.6, baixa) + Math.sin(t * 7) * 0.4 * pasta + ea * 1.5;
+  if (deit) { hx = L * 0.5 + 4; hy = -2.5 + (1 - morte) * Math.sin(t * 1.4) * 0.3; }
+  if (!faltandoVis(o, 'pescoco')) {
+    const nw = esp === 'veado' ? 3.6 : esp === 'lobo' ? 4.8 : 7.5;
+    g.beginPath(); g.moveTo(nx0 - nw * 0.4, ny0 - nw * 0.5); g.quadraticCurveTo((nx0 + hx) / 2 - 1, (ny0 + hy) / 2 - nw * 0.5, hx - 1, hy - 1); g.lineTo(hx + 0.5, hy + nw * 0.4); g.quadraticCurveTo((nx0 + hx) / 2 + 1, (ny0 + hy) / 2 + nw * 0.6, nx0 + nw * 0.4, ny0 + nw * 0.6); g.closePath();
+    g.fillStyle = E.cor; g.fill(); g.lineWidth = 1.2; g.strokeStyle = CONTORNO; g.stroke();
+    if (esp === 'lobo' && N > 0) { g.beginPath(); g.moveTo(nx0 + 1, ny0 + 2.5); g.lineTo(nx0 + 3, ny0 + 4.5); g.lineTo(nx0 + 3.6, ny0 + 2.6); g.lineTo(nx0 + 5, ny0 + 4); g.lineTo(hx - 0.5, hy + 1.6); g.lineWidth = 0.8; g.stroke(); g.fillStyle = E.claro; g.fill(); }
+    if (!faltandoVis(o, 'cabeca')) desenharCabecaAnimal(g, esp, hx, hy, o, ea, deit, morte, baixa);
+  }
+  for (const p of pernas) if (p.near) desenharPerna(p);
+  g.restore();
+}
+const faltandoVis = (o, id) => !!(o.perdidas && o.perdidas.includes(id));
+function desenharCabecaAnimal(g, esp, hx, hy, o, ea, deit, morte, baixa) {
+  const E = ESP_ANIMAL[esp];
+  g.save(); g.translate(hx, hy); g.rotate(baixa * 0.6 + (deit ? 0.3 : 0));
+  if (esp === 'veado') {
+    if (o.chifre && !deit) { g.beginPath(); g.moveTo(-0.5, -2.2); g.lineTo(-2.5, -8); g.lineTo(-5.5, -10.5); g.moveTo(-2.5, -8); g.lineTo(-1.2, -11.5); g.moveTo(-1.6, -5.5); g.lineTo(1.2, -7.5); g.moveTo(-3.8, -9.3); g.lineTo(-5.6, -7.8);
+      g.lineWidth = 2; g.strokeStyle = CONTORNO; g.stroke(); g.lineWidth = 1.1; g.strokeStyle = '#dccba2'; g.stroke(); }
+    g.beginPath(); g.moveTo(-1.5, -2); g.lineTo(-4.6, -4.8); g.lineTo(-2.4, -0.6); g.closePath(); g.fillStyle = E.escuro; g.fill(); g.lineWidth = 0.9; g.strokeStyle = CONTORNO; g.stroke();
+    g.beginPath(); g.moveTo(-2.6, -2.2); g.quadraticCurveTo(0.5, -3.6, 3.5, -1.6); g.quadraticCurveTo(5.8, -0.6, 5.6, 0.8); g.quadraticCurveTo(3, 1.9, -1.8, 1.8); g.quadraticCurveTo(-3.6, 0.4, -2.6, -2.2); g.closePath();
+    g.fillStyle = E.cor; g.fill(); g.lineWidth = 1.1; g.stroke(); circulo(g, 5.2, 0.2, 0.75); g.fillStyle = '#1a120c'; g.fill(); elipse(g, 2.6, 1.2, 2.2, 0.6); g.fillStyle = 'rgba(255,245,225,.6)'; g.fill();
+  } else if (esp === 'lobo') {
+    for (const ox of [-1.8, 0]) { g.beginPath(); g.moveTo(ox - 1.4, -2.2); g.lineTo(ox - 0.4, -6); g.lineTo(ox + 1.2, -2.2); g.closePath(); g.fillStyle = ox ? E.escuro : E.cor; g.fill(); g.lineWidth = 0.9; g.strokeStyle = CONTORNO; g.stroke(); }
+    const boca = ea;
+    g.beginPath(); g.moveTo(-2.6, -2.4); g.quadraticCurveTo(1, -3.2, 3.2, -1.6); g.lineTo(6.8, -0.8 - boca * 1.2); g.lineTo(6.6, 0.4 - boca * 0.4); g.lineTo(2.6, 0.8); g.quadraticCurveTo(-1.5, 2.6, -2.6, -2.4); g.closePath();
+    g.fillStyle = E.cor; g.fill(); g.lineWidth = 1.1; g.strokeStyle = CONTORNO; g.stroke();
+    if (boca > 0.15) { g.beginPath(); g.moveTo(2.6, 0.8); g.lineTo(6.2, 0.9 + boca * 2.2); g.lineTo(2.8, 2 + boca * 0.8); g.closePath(); g.fillStyle = E.claro; g.fill(); g.stroke(); g.beginPath(); g.moveTo(3.2, 0.9); g.lineTo(6.2, 0.4); g.lineTo(6.2, 0.9 + boca * 2.2); g.closePath(); g.fillStyle = '#7a1e1e'; g.fill();
+      g.beginPath(); for (const x of [4, 5.3]) { g.moveTo(x, 0.3); g.lineTo(x + 0.4, 1.3); } g.lineWidth = 0.6; g.strokeStyle = '#fff'; g.stroke(); }
+    circulo(g, 6.6, -0.6 - boca * 1.1, 0.8); g.fillStyle = '#16120e'; g.fill(); elipse(g, 2, 0.6, 2.2, 0.8); g.fillStyle = E.claro; g.fill();
+  } else {
+    for (const ox of [-2.2, 0.4]) { circulo(g, ox, -3.4, 1.7); g.fillStyle = ox < 0 ? E.escuro : E.cor; g.fill(); g.lineWidth = 0.9; g.strokeStyle = CONTORNO; g.stroke(); }
+    g.beginPath(); g.ellipse(0.5, -0.2, 4.4, 3.6, 0, 0, TAU); g.fillStyle = E.cor; g.fill(); g.lineWidth = 1.2; g.strokeStyle = CONTORNO; g.stroke();
+    elipse(g, 4.4, 0.6, 2.6, 1.9); g.fillStyle = E.claro; g.fill(); g.lineWidth = 0.9; g.stroke(); circulo(g, 6.2, 0.1, 0.9); g.fillStyle = '#16120e'; g.fill();
+    if (ea > 0.3) { g.beginPath(); g.moveTo(3.5, 2); g.lineTo(6.4, 2.4 + ea); g.lineWidth = 1; g.strokeStyle = '#7a1e1e'; g.stroke(); }
+  }
+  // olho (X quando morto)
+  const ex = esp === 'veado' ? 1.6 : esp === 'lobo' ? 1.8 : 2, ey = esp === 'veado' ? -1 : esp === 'lobo' ? -1.2 : -1;
+  if (faltandoVis(o, 'olhoD')) { g.beginPath(); g.moveTo(ex - 0.7, ey); g.lineTo(ex + 0.7, ey); g.lineWidth = 0.7; g.strokeStyle = '#6a1a1a'; g.stroke(); }
+  else if (morte > 0.5) { g.beginPath(); g.moveTo(ex - 0.6, ey - 0.6); g.lineTo(ex + 0.6, ey + 0.6); g.moveTo(ex + 0.6, ey - 0.6); g.lineTo(ex - 0.6, ey + 0.6); g.lineWidth = 0.6; g.strokeStyle = '#16120e'; g.stroke(); }
+  else if (deit) { g.beginPath(); g.moveTo(ex - 0.7, ey); g.lineTo(ex + 0.7, ey); g.lineWidth = 0.6; g.strokeStyle = '#16120e'; g.stroke(); }
+  else { circulo(g, ex, ey, 0.7); g.fillStyle = esp === 'lobo' ? '#e9c64a' : '#16120e'; g.fill(); if (esp === 'lobo') { circulo(g, ex + 0.15, ey, 0.32); g.fillStyle = '#16120e'; g.fill(); } }
+  g.restore();
+}
+function desenharAnimal(a, dtR) {
+  const E = ESP_ANIMAL[a.esp], V = VIS_ANIMAL[a.esp], x = a.rx * T + T / 2, y = a.ry * T + T / 2 + 6;
+  if (Q.nivel === 0) a.yawVis = YAW_DIR[dirDeYaw(a.yawAlvo)]; else a.yawVis += difAng(a.yawAlvo, a.yawVis) * Math.min(1, dtR * 8);
+  const s = Math.sin(a.yawVis), co = Math.cos(a.yawVis);
+  const alvoF = Math.abs(s) < 0.12 ? (a.vflip || 1) : Math.sign(s);
+  a.vflip = (a.vflip || 1) + (alvoF - (a.vflip || 1)) * Math.min(1, dtR * 9);
+  const sx = Math.sign(a.vflip || 1) * Math.max(0.2, Math.abs(a.vflip || 1)) * (Math.abs(co) > 0.85 ? 0.88 : 1);
+  const rv_ = a.rvel || 0, marcha = rv_ < 0.15 ? 'passo' : rv_ < 1.7 ? 'passo' : rv_ < 3.1 ? 'trote' : 'galope', mi = ['passo', 'trote', 'galope'].indexOf(marcha);
+  if (!estado.pausado) a.vfase = ((a.vfase || 0) + (dtR * rv_) / (V.marchas[mi] * (E.passo || 1))) % 1;
+  const w = clamp(rv_ / 1.4, 0, 1.3), morte = a.morto ? clamp(a.t / 0.7, 0, 1) : 0, v = a.vis || {};
+  const caido = a.saude && a.saude.caido && !a.morto;
+  a.vpasta = lerp(a.vpasta || 0, a.estado === 'pastar' && !a.morto && rv_ < 0.2 ? 1 : 0, Math.min(1, dtR * 4));
+  a.vfare = lerp(a.vfare || 0, a.esp !== 'veado' && a.estado === 'vagar' && rv_ < 0.2 && !a.morto ? 1 : 0, Math.min(1, dtR * 3));
+  ctx.save(); ctx.translate(x, y); ctx.scale(sx, 1);
+  corpoAnimal(ctx, a.esp, { fase: a.vfase || 0, w, marcha, morte, deitado: caido ? 1 : 0, t: tempoReal + a.id, pasta: a.vpasta, fareja: a.vfare, atk: a.atk || 0, chifre: a.chifre, flash: v.golpe > 0 ? v.golpe * 2 : 0,
+    manca: !a.morto ? pernaMancaAnimal(a) : null, perdidas: a.saude ? a.saude.perdidas : null, alerta: a.alerta > 0.6 });
+  ctx.restore();
+  const topo = y - V.alt - V.H - (a.esp === 'veado' ? 10 : 4);
+  if (a.cacar && !a.morto) { ctx.save(); ctx.translate(x, topo - 8); circulo(ctx, 0, 0, 4.5); ctx.lineWidth = 1.4; ctx.strokeStyle = '#e04848'; ctx.stroke(); ctx.beginPath(); ctx.moveTo(-7, 0); ctx.lineTo(-2, 0); ctx.moveTo(2, 0); ctx.lineTo(7, 0); ctx.moveTo(0, -7); ctx.lineTo(0, -2); ctx.moveTo(0, 2); ctx.lineTo(0, 7); ctx.stroke(); ctx.restore(); }
+  if (!a.morto && a.hp < E.hp - 0.5) { const bw = 16; ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(x - bw / 2, topo, bw, 2.6); ctx.fillStyle = '#c94a3a'; ctx.fillRect(x - bw / 2, topo, bw * Math.max(0, a.hp / E.hp), 2.6); }
+  if (!a.morto && a.alerta > 0.45 && a.estado !== 'atacar' && !caido) { ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(0,0,0,.8)'; const tx = a.alerta >= 1 ? '!' : '?'; ctx.strokeText(tx, x, topo - 3); ctx.fillStyle = a.alerta >= 1 ? '#ffd770' : '#ddd'; ctx.fillText(tx, x, topo - 3); }
+}
+/* ---------------- resgate fluido: andar → desacelerar → ajoelhar → deslizar os braços → erguer → acomodar ---------------- */
+const DUR_PEGAR = 2.4, DUR_SOLTAR = 1.7;
+function faseResgate(t) { // devolve {lift 0..1, ajo 0..1, alcance 0..1, sob 0..1, esforco 0..1}
+  if (t.fase === 'pegando') { const u = t.t;
+    return { lift: u < 1.1 ? 0 : u < 2.0 ? suave((u - 1.1) / 0.9) : 1 + Math.sin(clamp((u - 2.0) / 0.4, 0, 1) * Math.PI) * 0.05,
+      ajo: u < 0.5 ? suave(u / 0.5) : u < 1.1 ? 1 : u < 2.0 ? 1 - suave((u - 1.1) / 0.9) : 0, alcance: suave(clamp(u / 0.55, 0, 1)), sob: suave(clamp((u - 0.5) / 0.6, 0, 1)), esforco: u > 1.0 && u < 2.05 ? Math.sin((u - 1.0) / 1.05 * Math.PI) : 0 }; }
+  if (t.fase === 'soltando') { const u = t.t;
+    return { lift: u < 0.3 ? 1 : u < 1.25 ? 1 - suave((u - 0.3) / 0.95) : 0, ajo: u < 0.55 ? suave(u / 0.55) : u < 1.25 ? 1 : 1 - suave((u - 1.25) / 0.45), alcance: u < 1.25 ? 1 : 1 - suave((u - 1.25) / 0.45), sob: u < 1.25 ? 1 : 1 - suave((u - 1.25) / 0.35), esforco: u > 0.3 && u < 1.25 ? 0.5 * Math.sin((u - 0.3) / 0.95 * Math.PI) : 0 }; }
+  return { lift: 1, ajo: 0, alcance: 1, sob: 1, esforco: 0 };
+}
+function pendulo(p, drive) { // membros soltos do paciente balançam (mola amortecida)
+  const v = visDe(p); const now = tempoReal, dt = clamp(now - (v.tp || now), 0, 0.05); v.tp = now;
+  v.pa = v.pa || 0; v.pv = v.pv || 0;
+  v.pv += (-55 * v.pa - 6 * v.pv + drive * 40) * dt; v.pa += v.pv * dt; v.pa = clamp(v.pa, -1.6, 1.6);
+  return v.pa;
+}
+function poseCarregando(c, x, y, ex) {
+  const t = c.tarefa, p = t.paciente; if (!p) return { extra: ex };
+  const R = faseResgate(t), e = clamp(R.lift, 0, 1.05);
+  const yaw = c.yawVis || 0, s = Math.sin(yaw), co = Math.cos(yaw), lx = co, ly = -s * 0.5, fx = s, fy = co * 0.55;
+  let gx = (p.rx ?? p.x) * T + T / 2, gy = (p.ry ?? p.y) * T + T / 2 + 2;
+  if (t.fase === 'pegando' || t.fase === 'soltando') { // o paciente está no tile vizinho: é puxado para junto dos joelhos de quem resgata
+    const dx = gx - x, dy = gy - y, dd = Math.hypot(dx, dy) || 1, perto = 11, k = clamp(R.sob * 0.85 + R.alcance * 0.15, 0, 1);
+    if (dd > perto) { gx = lerp(gx, x + dx / dd * perto, k); gy = lerp(gy, y + dy / dd * perto, k); }
+  }
+  const fase = ((c.rdist / CICLO_PASSO) % 1 + 1) % 1, sw = Math.sin(fase * TAU) * 0.8, spd = clamp((c.rvel || 0) / 1.6, 0, 1);
+  const pa = pendulo(p, Math.sin(fase * TAU * 2) * spd + (R.esforco ? Math.sin(tempoReal * 30) * 0.15 : 0));
+  const headBob = { x: pa * 0.5, y: Math.sin(fase * TAU * 2 + 0.8) * 0.9 * spd + Math.abs(pa) * 0.4 };
+  ex.escudo = false;
+  const pe = t.estilo === 'apoio' ? 0 : t.estilo === 'cavalinho' ? 0.45 : 1;
+  ex.ajoelha = R.ajo * pe + (t.fase === 'levando' && (t.estilo === 'ombro' || t.estilo === 'colo') ? 0.18 : 0);
+  if (R.esforco > 0.2) { visDe(c).careta = Math.max(visDe(c).careta, 0.5 * R.esforco); ex.inclinaExtra = (ex.inclinaExtra || 0) + Math.sin(tempoReal * 38) * 0.018 * R.esforco; }
+  // transferência de peso: inclina para o lado contrário da carga
+  const lado = co >= 0 ? 1 : -1;
+  ex.inclinaExtra = (ex.inclinaExtra || 0) + (t.estilo === 'ombro' ? -0.06 * lado * e : t.estilo === 'colo' ? sw * 0.03 * e : t.estilo === 'arrastar' ? Math.sign(s || 1) * 0.08 : t.estilo === 'apoio' ? 0.07 * lado : 0.03 * sw);
+  const real = { x: gx - x, y: gy - y + R.sob * 3 }, perto = { x: fx * 5, y: 6 + fy * 5 };
+  const acao = { tipo: 'carregar_' + t.estilo, f: fase, k: e, alvo: { x: lerp(perto.x, real.x, R.alcance), y: lerp(perto.y, real.y, R.alcance) } };
+  const pex = { fechados: saude(p).inconsciente, cabecaOff: headBob, pesBalanco: pa * 2.2 };
+  const H = Math.PI / 2;
+  if (t.estilo === 'ombro') {
+    const sx = x + lx * 2, sy = y - 12 + sw * 0.5 + (ex.ajoelha || 0) * 4, X = lerp(gx, sx, e), Y = lerp(gy, sy, e) - Math.sin(clamp(e, 0, 1) * Math.PI) * 6, A = -H * lado * lerp(1, 0.92, e) + pa * 0.05;
+    const d = () => desenharCarregado(p, X, Y, A, lerp(1, 0.9, e), Object.assign(pex, { maosExtra: () => [{ x: -6 + pa * 2.4, y: 13 + sw + Math.abs(pa), atras: false }, { x: -4 + pa * 2.8, y: 14 - sw + Math.abs(pa) * 0.6, atras: false }] }));
+    return e < 0.35 ? { extra: ex, acao, antes: d } : { extra: ex, acao, depois: d };
+  }
+  if (t.estilo === 'colo') {
+    const fxp = x + fx * 5, fyp = y - 2 + fy * 5 + (ex.ajoelha || 0) * 4, X = lerp(gx, fxp, e), Y = lerp(gy, fyp, e) - Math.sin(clamp(e, 0, 1) * Math.PI) * 4, A = lerp(-H, -H + 0.15 * Math.sign(lx || 1), e) + pa * 0.04;
+    const d = () => desenharCarregado(p, X, Y, A, lerp(1, 0.86, e), Object.assign(pex, { maosExtra: (m) => [{ x: -3, y: 2, atras: false }, { x: m[1].x + pa * 2.5, y: m[1].y + 2.5 + Math.abs(pa), atras: false }] }));
+    return co < -0.25 ? { extra: ex, acao, antes: d } : { extra: ex, acao, depois: d };
+  }
+  if (t.estilo === 'arrastar') {
+    const A = Math.atan2(x - gx, -(y - gy));
+    const d = () => desenharCarregado(p, gx, gy, A, 1, Object.assign(pex, { cabecaOff: { x: pa * 0.6, y: headBob.y * 0.5 }, maosExtra: () => [{ x: -2.5, y: lerp(9, -15, e), atras: false }, { x: 2.5, y: lerp(9, -15, e), atras: false }] }));
+    if (t.fase === 'levando' && Q.nivel > 0 && c.rvel > 0.3 && rndVis() < 0.25) particula('poeira', gx + rv(-4, 4), gy + 6, 1, rv(-5, 5), rv(-3, 3), 3, 0.6, { g: 0, tam: 2.5 });
+    return { extra: ex, acao, antes: d, dyaw: t.fase === 'pegando' ? 0 : Math.PI };
+  }
+  if (t.estilo === 'apoio') { acao.alvo = { x: gx - x, y: gy - 10 - y }; return { extra: Object.assign(ex, { manca: 0 }), acao }; }
+  if (t.estilo === 'cavalinho') {
+    const bx = x - fx * 3.5, by = y - 9 - fy * 3.5 + (ex.ajoelha || 0) * 3, X = lerp(gx, bx, e), Y = lerp(gy - 2, by, e) - Math.sin(clamp(e, 0, 1) * Math.PI) * 4;
+    const d = () => { desenharCarregado(p, X, Y, 0, 0.95, Object.assign(pex, { yaw, semPes: e > 0.5, maosExtra: (m, b) => e > 0.5 ? [{ x: -b.lx * 5 + b.fx * 4, y: 6 + b.fy * 4, atras: false }, { x: b.lx * 5 + b.fx * 4, y: 6 + b.fy * 4, atras: false }] : m }));
+      if (e > 0.5) for (const sd of [-1, 1]) { elipse(ctx, x + lx * sd * 8.5 - fx * 1 + pa * sd * 0.8, y + 9 + ly * sd * 8.5 + Math.abs(pa) * 0.8, 2.3, 1.7); ctx.fillStyle = '#3b2d22'; ctx.fill(); ctx.lineWidth = 1.1; ctx.strokeStyle = CONTORNO; ctx.stroke(); } };
+    return co > -0.25 ? { extra: ex, acao, antes: d } : { extra: ex, acao, depois: d };
+  }
+  return { extra: ex, acao };
+}
+function prepararPose(c, x, y) {
+  const t = c.tarefa;
+  { const rr = c.resgatador, tr = rr && rr.tarefa; // sendo erguido/deitado: quem resgata desenha (sem cópia dupla)
+    if (tr && tr.tipo === 'resgatar' && tr.paciente === c && (tr.fase === 'pegando' || tr.fase === 'soltando') && tr.estilo !== 'apoio' && !c.carregadoPor) return { feito: true }; }
+  let r;
+  if (c.saude && !c.visitante && !c.carregadoPor && t && t.tipo === 'resgatar' && ['pegando', 'levando', 'soltando'].includes(t.fase) && !poseDeitada(c)) r = poseCarregando(c, x, y, extrasFerido(c));
+  else r = prepararPoseV8(c, x, y);
+  // ajoelhar / sentar suave (também ao chegar para tratar)
+  if (r && r.extra && !c.visitante) {
+    const v = visDe(c), now = tempoReal, dt = clamp(now - (v.tj || now), 0, 0.1); v.tj = now;
+    const alvo = r.extra.ajoelha || 0; v.ajo = v.ajo === undefined ? alvo : v.ajo + (alvo - v.ajo) * Math.min(1, dt * (t && t.tipo === 'resgatar' ? 30 : 7));
+    r.extra.ajoelha = v.ajo;
+  }
+  return r;
+}
+// desacelera ao chegar perto do paciente (resgate e tratamento)
+function freioChegada(c) {
+  const t = c.tarefa; if (!t || !t.paciente) return 1;
+  if (!((t.tipo === 'resgatar' && t.fase === 'indo') || (t.tipo === 'tratar' && t.fase === 'ir'))) return 1;
+  const d = Math.hypot(t.paciente.x - c.x, t.paciente.y - c.y);
+  return d > 3.2 ? 1 : lerp(0.42, 1, clamp((d - 1.2) / 2, 0, 1));
+}
+/* ---------------- tratamento legível: anel na parte ferida + balão com o ícone e o progresso ---------------- */
+const ICONE_TRAT = { pressionar: '✋', limpar: '💧', tratarInfeccao: '🌿', examinar: '❤', ajudarSentar: '🤝', tratarNaCama: '🩺', talaPerna: '🦴', talaBraco: '🦴' };
+function desenharOverlaySaude(g) {
+  for (const m of colonos) {
+    const t = m.tarefa; if (!t || !t.paciente) continue;
+    const ativo = (t.tipo === 'tratar' && t.fase === 'fazendo') || (t.tipo === 'resgatar' && t.fase === 'estabilizar'); if (!ativo) continue;
+    const p = t.paciente, an = t.anim || 'pressionar', f = t.f;
+    const parte = an === 'examinar' ? 'pescoco' : an === 'ajudarSentar' ? 'torso' : f ? f.parte : 'torso';
+    const pw = posParteMundo(p, parte), k = clamp(t.progresso / (t.total || 1), 0, 1), pul = 1 + Math.sin(tempoReal * 6) * 0.15;
+    const cor = an === 'pressionar' ? '#ff5a4a' : an === 'tratarInfeccao' ? '#9be060' : an.startsWith('tala') ? '#e0b070' : '#9fe0ff';
+    circulo(g, pw.x, pw.y, 4.2 * pul); g.lineWidth = 1.2; g.strokeStyle = cor; g.globalAlpha = 0.85; g.stroke(); g.globalAlpha = 1;
+    if (camera.zoom < 0.55) continue;
+    const bx = m.rx * T + T / 2, by = m.ry * T + T / 2 - 30;
+    g.beginPath(); g.roundRect(bx - 8, by - 8, 16, 16, 4); g.fillStyle = 'rgba(20,18,14,.82)'; g.fill(); g.lineWidth = 1; g.strokeStyle = cor; g.stroke();
+    g.beginPath(); g.arc(bx, by, 9.5, -Math.PI / 2, -Math.PI / 2 + k * TAU); g.lineWidth = 1.8; g.strokeStyle = '#ffd770'; g.stroke();
+    g.font = '9px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    const ic = ICONE_TRAT[an] || (an.startsWith('bandagem') ? '🩹' : '✚'); g.fillStyle = '#fff'; g.fillText(ic, bx, by + 0.5);
+    if (camera.zoom > 1.1) { g.font = '6px sans-serif'; g.fillStyle = '#fff3c4'; g.fillText((PARTES[parte] || { nome: '' }).nome.toLowerCase(), bx, by + 14); }
+  }
+}
+/* ---------------- cadáveres ---------------- */
+function desenharCadaveres(g) {
+  for (const k of cadaveres) {
+    const x = k.x * T + T / 2, y = k.y * T + T / 2;
+    g.save(); g.translate(x, y + 2); g.rotate(-Math.PI / 2);
+    g.globalAlpha = 0.92; desenharColono(g, k.c, 0, 0, { yaw: 0, fechados: true, semPes: false, curativos: [] }); g.globalAlpha = 1;
+    g.restore();
+    g.save(); elipse(g, x, y + 2, 13, 9); g.fillStyle = 'rgba(80,90,110,.22)'; g.fill(); g.restore();
+    if (camera.zoom > 0.6) { g.font = 'bold 7px sans-serif'; g.textAlign = 'center'; g.lineWidth = 2.4; g.strokeStyle = 'rgba(0,0,0,.8)'; g.strokeText('☠ ' + k.nome, x, y - 12); g.fillStyle = '#d8d8e0'; g.fillText('☠ ' + k.nome, x, y - 12); }
+  }
+}
+/* ---------------- fabricar bandagem: enrola a tira no rolo (o rolo cresce) ---------------- */
+POSES.enrolar = (ac, b) => { const f = ac.f, ang = f * TAU * 2, cx = b.fx * 6, cy = 7 + b.fy * 6, r = 1.8 + (ac.k || 0) * 1.4;
+  const rolo = { x: cx + Math.cos(ang) * 1.2, y: cy + Math.sin(ang) * 0.6 }, puxa = { x: cx - b.lx * (4 + Math.sin(f * TAU) * 2), y: cy - 1.5 + Math.cos(f * TAU) };
+  return { maos: [P_(rolo.x + b.lx * 1.5, rolo.y, b.atras), P_(puxa.x, puxa.y, b.atras)], prop: g => {
+    g.beginPath(); g.moveTo(puxa.x, puxa.y); g.lineTo(rolo.x, rolo.y - r * 0.6); g.lineWidth = 1.3; g.strokeStyle = '#f4f1e8'; g.stroke();
+    circulo(g, rolo.x, rolo.y, r); g.fillStyle = '#f4f1e8'; g.fill(); g.lineWidth = 0.8; g.strokeStyle = CONTORNO; g.stroke();
+    g.beginPath(); g.arc(rolo.x, rolo.y, r * 0.6, ang, ang + 2); g.lineWidth = 0.5; g.strokeStyle = '#c9c2b0'; g.stroke(); } }; };
+ACOES.enrolar = { ritmo: 0.9, golpes: [] };
+/* ---------------- save v10 ---------------- */
+function serializarCadaveres() { return cadaveres.map(k => { const o = {}; for (const kk in k.c) if (!SEM_SALVAR.has(kk)) o[kk] = k.c[kk]; return { nome: k.nome, x: k.x, y: k.y, causa: k.causa, quando: k.quando, c: o }; }); }
+function aplicarCadaveres(l) { cadaveres.length = 0; for (const k of l || []) cadaveres.push({ ...k, c: Object.assign({ caminho: [], memorias: [], opiniao: {}, prioridades: {} }, k.c), t: 0 }); }
+function curativosDe(c) {
+  const l = []; if (!c.saude) return l;
+  for (const f of c.saude.feridas) {
+    if (f.tipo === 'cicatriz') continue;
+    const P = PARTES[f.parte]; if (!P || P.prof === 'dentro' && !f.sangra) continue;
+    if (f.tala) l.push({ parte: f.parte, tipo: 'tala' });
+    if (f.band || (f.trat && f.tipo !== 'contusao')) l.push({ parte: f.parte, tipo: f.band ? 'band' : 'pano' }); else if (f.sangra > 0) l.push({ parte: f.parte, tipo: 'sangue' });
+    if (f.infec > 0.15) l.push({ parte: f.parte, tipo: 'infec' });
+  }
+  return l;
+}
+instalarUI10();
+window.V10 = { ANAT, PARTES, golpear, aplicarDano, destruirParte, capacidades, eficiencia, hpAtual, morrer, ressuscitar, cadaveres, atualizarSaude, dorDe, perdaSangue, svgCorpo, htmlSaude, abrirAnatomia, faseResgate, qualidadeTrat, habMed, pernaMancaAnimal, taxaSangramento, CAMADAS };
 
 /* =========================== MODO DEV (v9) ===========================
    Entrada só por Opções → "Modo Dev". A senha é fixa: o código guarda apenas o hash
@@ -5126,7 +5965,7 @@ const devLog = t => log('🛠 DEV: ' + t, 'dev');
 
 /* ---------- ações ---------- */
 const PARTES_OPC = () => Object.keys(PARTES).map(k => [k, PARTES[k].nome]);
-const ITENS_DEV = ['MADEIRA', 'PEDRA', 'FRUTAS', 'MILHO', 'CARNE', 'PELE', 'FLECHAS', 'BANDAGEM', 'MACHADO', 'PICARETA', 'ESPADA', 'ARCO', 'ESCUDO'];
+const ITENS_DEV = ['MADEIRA', 'PEDRA', 'FRUTAS', 'MILHO', 'CARNE', 'PELE', 'FLECHAS', 'BANDAGEM', 'BANDAGEM_BOA', 'MACHADO', 'PICARETA', 'ESPADA', 'ARCO', 'ESCUDO'];
 const ARV_DEV = [[1, 'Carvalho'], [2, 'Pinheiro'], [3, 'Álamo'], [5, 'Bétula'], [6, 'Bordo']];
 function colonoNoTile(x, y) { let m = null, md = 1.3; for (const c of colonos) { const d = Math.hypot(c.x - x, c.y - y); if (d < md) { md = d; m = c; } } return m; }
 const livreBloquear = (x, y) => { if (!dentro(x, y)) return false; const i = idx(x, y), t = mapa.terreno[i];
@@ -5195,7 +6034,7 @@ function avancarTempo(min) { // simula de verdade (1 minuto de jogo por passo)
   finally { estado.velocidade = v; estado.pausado = p; }
 }
 function colonoAlvo(x, y, f, rot) { const c = colonoNoTile(x, y); if (!c) { mostrarToast('Clique/toque num colono'); return false; } f(c); devLog(`${rot} — ${c.nome}`); return true; }
-const FER_DEV = [['contusao', 'Contusão'], ['corte', 'Corte'], ['sleve', 'Sangramento leve'], ['smedio', 'Sangramento médio'], ['sforte', 'Sangramento forte'], ['fratura', 'Fratura'], ['infeccao', 'Infecção'], ['desmaio', 'Desmaio']];
+const FER_DEV = [['contusao', 'Contusão'], ['corte', 'Corte'], ['queimadura', 'Queimadura'], ['mordida', 'Mordida'], ['arranhao', 'Arranhão'], ['perfuracao', 'Perfuração'], ['sleve', 'Sangramento leve'], ['smedio', 'Sangramento médio'], ['sforte', 'Sangramento forte'], ['fratura', 'Fratura'], ['infeccao', 'Infecção'], ['desmaio', 'Desmaio']];
 function aplicarFerida(c, tipo, parte, sev) {
   const s = saude(c);
   if (tipo === 'desmaio') { s.sangue = Math.min(s.sangue, 35); recalcularSaude(c); if (!s.caido) cair(c); return; }
@@ -5231,6 +6070,12 @@ addDev({ id: 'col_equipar', cat: 'Colonos', nome: 'Equipar (espada + escudo, ban
 addDev({ id: 'col_arqueiro', cat: 'Colonos', nome: 'Equipar (arco + 20 flechas) — clique', mapa: (p) => colonoAlvo(p.x, p.y, c => { c.arma = 'arco'; c.escudo = false; c.flechas = 20; }, 'arqueiro') ? 1 : 0 });
 addDev({ id: 'fer', cat: 'Ferimentos', nome: 'Ferir colono (clique)', campos: ['ferida', 'parte', 'sev'], mapa: (p, q, P) => colonoAlvo(p.x, p.y, c => aplicarFerida(c, P.ferida, P.parte, P.sev / 100), `ferida ${P.ferida} em ${PARTES[P.parte].nome}`) ? 1 : 0 });
 for (const [k, n] of FER_DEV) addDev({ id: 'fer_' + k, cat: 'Ferimentos', nome: n + ' (parte escolhida) — clique', campos: ['parte', 'sev'], mapa: (p, q, P) => colonoAlvo(p.x, p.y, c => aplicarFerida(c, k, P.parte, P.sev / 100), `${n.toLowerCase()} em ${PARTES[P.parte].nome}`) ? 1 : 0 });
+addDev({ id: 'fer_destruir', cat: 'Ferimentos', nome: 'Destruir parte (escolhida) — clique', campos: ['parte'], mapa: (p, q, P) => colonoAlvo(p.x, p.y, c => { destruirParte(c, P.parte, 'corte', 'dev'); recalcularSaude(c); }, `${PARTES[P.parte].nome} destruído(a)`) ? 1 : 0 });
+addDev({ id: 'fer_golpe', cat: 'Ferimentos', nome: 'Golpe aleatório (corte 12) — clique', mapa: (p) => colonoAlvo(p.x, p.y, c => { golpear(c, 'corte', 12, 'dev'); }, 'golpe') ? 1 : 0 });
+addDev({ id: 'col_matar', cat: 'Colonos', nome: 'Matar colono (clique)', mapa: (p) => colonoAlvo(p.x, p.y, c => morrer(c, 'modo dev'), 'morto') ? 1 : 0 });
+addDev({ id: 'col_ressusc', cat: 'Colonos', nome: 'Ressuscitar (clique no corpo)', mapa: (p) => { const k = cadaveres.find(k => Math.hypot(k.x - p.x, k.y - p.y) < 1.6); if (!k) return 0; ressuscitar(k); devLog(k.nome + ' ressuscitado(a)'); return 1; } });
+addDev({ id: 'col_ressuscTodos', cat: 'Colonos', nome: 'Ressuscitar todos', rodar: () => { const n = cadaveres.length; for (const k of cadaveres.slice()) ressuscitar(k); return n + ' corpos'; } });
+addDev({ id: 'an_ferir', cat: 'Animais', nome: 'Ferir animal (golpe 15) — clique', mapa: (p) => { const a = animais.find(a => !a.morto && Math.hypot(a.x - p.x, a.y - p.y) < 1.6); if (!a) return 0; ferirAnimal(a, 15, null, 'corte'); return 1; } });
 for (const [t, nome] of [['parede_madeira', 'Parede de madeira'], ['parede_pedra', 'Parede de pedra'], ['porta', 'Porta'], ['cama', 'Cama'], ['bancada', 'Bancada']])
   addDev({ id: 'con_' + t, cat: 'Construções', nome: nome + ' (instantânea)', mapa: (p, q) => construirJa(p, q, t), dica: t.startsWith('parede') ? 'arraste: linha, ou retângulo = sala com porta' : '' });
 addDev({ id: 'con_obras', cat: 'Construções', nome: 'Concluir todas as plantas', rodar: () => { const n = mapa.obra.size; for (const o of [...mapa.obra.values()]) concluirObra(o); return n + ' obras'; } });
