@@ -2853,6 +2853,7 @@ function render(dtR = 0) {
     ctx.font = fonte(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.lineWidth = 3 * k; ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ctx.strokeText(`${o.entregue}/${cu}`, p.x, p.y); ctx.fillStyle = '#c4dcff'; ctx.fillText(`${o.entregue}/${cu}`, p.x, p.y);
   }
+  v11Overlay(ctx, k);
   for (const c of todos) {
     const wx = c.rx * T + T / 2, wy = c.ry * T + T / 2;
     if (camera.zoom > 0.6 && !c.carregadoPor && (!c.animal || devCfg.revelar || c === (inspecao && inspecao.animal) || c.cacar || c.estado === 'atacar')) { const p = mundoParaTela(wx, wy + 15); rotulo(ctx, c.nome + (c.visitante ? ' (visitante)' : c.triste ? ' (triste)' : (c.saude && c.saude.caido ? ' (caído)' : '')), p.x, p.y, c.visitante ? '#e8d48a' : c.triste ? '#9db8ff' : (c === selecionado ? '#fff' : '#ddd')); }
@@ -3434,7 +3435,7 @@ function atualizarUI() {
       barraNec('Humor', c.humor) + barraNec('Fome', c.fome) + barraNec('Sono', c.sono) +
       `<div class="sub" style="margin:6px 0 0">Ferramentas: <span style="color:#eee">${fl}</span> · Dorme: ${c.camaPropria ? 'na própria cama' : 'em saco de dormir'}</div>` +
       `<div class="sub" style="margin:6px 0 2px">Pensamentos (base 50)</div>${pens || '<div class="pens"><span style="color:#888">Nada em especial.</span></div>'}` +
-      `<div class="sub" style="margin-top:4px">Equipamento: <span style="color:#eee">${textoEquip(c)}</span> · Saúde: <span style="color:${c.saude.feridas.length ? '#ff9a7a' : '#9c9'}">${c.saude.caido ? 'caído(a)' : c.saude.feridas.length ? c.saude.feridas.length + ' ferimento(s), dor ' + Math.round(c.saude.dor * 100) + '%' : 'saudável'}</span></div>` +
+      `<div class="sub" style="margin-top:4px">Equipamento: <span style="color:#eee">${textoEquip(c)}</span>${v11Info(c)} · Saúde: <span style="color:${c.saude.feridas.length ? '#ff9a7a' : '#9c9'}">${c.saude.caido ? 'caído(a)' : c.saude.feridas.length ? c.saude.feridas.length + ' ferimento(s), dor ' + Math.round(c.saude.dor * 100) + '%' : 'saudável'}</span></div>` +
       `<div class="sub" style="margin-top:6px">Opinião: ${ops}</div>`;
     ins.innerHTML = abaInspecao === 'saude' ? htmlSaude(c) : tabsInspecao() + ins.innerHTML;
   } else if (inspecao) {
@@ -3784,7 +3785,7 @@ function coberto(c, a) { // árvore, arbusto, rocha ou parede entre o colono e o
 }
 function linhaDeVisao(c, a) {
   const d = Math.hypot(a.x - c.x, a.y - c.y), n = Math.ceil(d * 2);
-  for (let k = 1; k < n; k++) { const x = Math.round(lerp(c.x, a.x, k / n)), y = Math.round(lerp(c.y, a.y, k / n)), i = idx(x, y); if (mapa.terreno[i] === TERRENO.ROCHA || (mapa.estrutura[i] && mapa.estrutura[i] !== ESTR.CAMA && mapa.estrutura[i] !== ESTR.BANCADA && mapa.estrutura[i] !== ESTR.PORTA)) return false; }
+  const sobre = c.arma === 'arco' ? (c.dentro11 ? 2.6 : 1.5) : 0; for (let k = 1; k < n; k++) { if (sobre && k / n * d < sobre) continue; const x = Math.round(lerp(c.x, a.x, k / n)), y = Math.round(lerp(c.y, a.y, k / n)), i = idx(x, y); if (mapa.terreno[i] === TERRENO.ROCHA || (mapa.estrutura[i] && mapa.estrutura[i] !== ESTR.CAMA && mapa.estrutura[i] !== ESTR.BANCADA && mapa.estrutura[i] !== ESTR.PORTA)) return false; }
   return true;
 }
 // percepção: visão (distância, agachado, cobertura, noite) + faro (colono a favor do vento)
@@ -3824,7 +3825,7 @@ function atualizarAnimal(a, dt) {
   const viu = perceber(a, dt);
   let lento = E.anda;
   // fuga quando muito ferido (predadores) ou partida do mapa
-  if (a.esp !== 'veado' && a.estado !== 'partir' && a.hp < E.hp * (a.esp === 'urso' ? 0.25 : 0.35)) { a.estado = 'partir'; a.caminho = []; log(`O ${E.nome.toLowerCase()} ferido foge!`, 'bom'); }
+  if (a.esp !== 'veado' && a.estado !== 'partir' && a.hp < E.hp * (a.esp === 'urso' ? 0.3 : 0.5)) { a.estado = 'partir'; a.caminho = []; log(`O ${E.nome.toLowerCase()} ferido foge!`, 'bom'); }
   if (a.ate && agora() > a.ate && a.estado !== 'partir' && a.estado !== 'atacar') { a.estado = 'partir'; a.caminho = []; }
   if (a.estado === 'partir') {
     lento = E.corre * 0.9;
@@ -3903,7 +3904,7 @@ function atualizarProjeteis(dt) {
     if (p.t < p.dur) continue;
     projeteis.splice(k, 1);
     const a = p.presa;
-    if (p.acerta && a && !a.morto && animais.includes(a) && Math.hypot(a.x - p.x1, a.y - p.y1) < 1.4) { ferirAnimal(a, p.dano, p.autor); estado.stats.flechasAcerto++; }
+    if (p.acerta && a && !a.morto && v11Valido(a) && Math.hypot(a.x - p.x1, a.y - p.y1) < 1.4) { ferirAnimal(a, p.dano, p.autor); estado.stats.flechasAcerto++; }
     else flechasChao.push({ x: p.x1, y: p.y1, ang: Math.atan2(p.y1 - p.y0, p.x1 - p.x0), t: 0 });
     if (flechasChao.length > 40) flechasChao.shift();
   }
@@ -4158,12 +4159,12 @@ function executarV8(c, dt, min) {
         c.caminho = []; virarPara(c, p.x, p.y);
         const fb = taxaSangramento(p) >= 6 && saude(p).feridas.filter(f => f.sangra >= 2.5 && !f.pressionado && !f.band).sort((a, b) => b.sangra - a.sangra)[0];
         if (fb) { t.fase = 'estabilizar'; t.f = fb; t.anim = 'pressionar'; t.progresso = 0; t.total = DUR_TRAT.pressionar; c.acaoF = c.aAcaoF = 0; contarAnim('pressionar'); log(`${c.nome} pressiona o sangramento de ${p.nome} antes de carregá-lo(a).`); return true; }
-        t.fase = 'pegando'; t.t = 0; t.cama = (p.tarefa && p.tarefa.cama) || escolherCama(p); if (t.cama.real && t.cama.ref) t.cama.ref.paciente = p;
-        t.estilo = estiloResgate(c, p); return true;
+        t.fase = 'pegando'; t.t = 0; t.cama = t.cama11 || (p.tarefa && p.tarefa.cama) || escolherCama(p); if (t.cama.real && t.cama.ref) t.cama.ref.paciente = p;
+        t.estilo = t.estilo11 || estiloResgate(c, p); return true;
       }
       if (t.fase === 'estabilizar') {
         virarPara(c, p.x, p.y); t.progresso += min; avancarAcao(c, t, dt);
-        if (t.progresso >= t.total) { aplicarTratamento(c, p, t.f, 'pressionar'); t.fase = 'pegando'; t.t = 0; t.cama = escolherCama(p); t.estilo = estiloResgate(c, p); t.total = 0; }
+        if (t.progresso >= t.total) { aplicarTratamento(c, p, t.f, 'pressionar'); t.fase = 'pegando'; t.t = 0; t.cama = t.cama11 || escolherCama(p); t.estilo = t.estilo11 || estiloResgate(c, p); t.total = 0; }
         return true;
       }
       if (t.fase === 'pegando') {
@@ -4225,13 +4226,15 @@ function executarV8(c, dt, min) {
     }
     case 'lutar': {
       const a = t.presa;
-      if (!a || a.morto || !animais.includes(a)) { fim(c); c.pensarT = 1; return true; }
+      if (!v11Valido(a) && !(a && a.animal && !a.morto && animais.includes(a))) { fim(c); c.pensarT = 1; return true; }
+      if (!t.cacada && !t.job && v11Lutar(c, t, dt)) return true;
+      if (t.presa !== a) return true;
       if (!t.job && !t.cacada && ((saude(c).dor || 0) > 0.6 || capDe(c).movimento < 0.35) && !(a.saude && a.saude.caido)) { log(`${c.nome}, muito ferido(a), recua do ${a.nome.toLowerCase()}.`, 'ruim'); fim(c); iniciarFuga(c, a); return true; }
       t.ini = t.ini || agora();
       if (t.segurar && t.cacada && cacadas.includes(t.cacada) && agora() - t.ini < 30 && t.segurar(c, t)) { c.caminho = []; c.agachado = true; virarPara(c, a.x, a.y); return true; }
       c.agachado = false;
       const d = Math.hypot(a.x - c.x, a.y - c.y), arco = c.arma === 'arco' && c.flechas > 0;
-      const alcance = arco ? 7.5 : (a.saude && a.saude.caido ? 2.1 : 1.9); // inclui a diagonal (e o tamanho do bicho)
+      const alcance = arco ? (c.arcoLongo ? 10 : 7.5) : (a.saude && a.saude.caido ? 2.1 : 1.9); // inclui a diagonal (e o tamanho do bicho)
       t.rp -= dt;
       t.ini = t.ini || agora();
       const fugindo = a.estado === 'partir' && d > alcance + 1.5, limite = t.cacada ? 300 : t.job ? 360 : 150;
@@ -4787,6 +4790,7 @@ function fatorMovTotal(c) {
   const t = c.tarefa; let k = fatorMov(c) * (c.agachado ? 0.45 : 1) * freioChegada(c);
   if (t && t.tipo === 'resgatar' && t.fase === 'levando') k *= ESTILO_CARGA[t.estilo].vel;
   if (t && t.tipo === 'fugir') k *= 1.12;
+  k *= (0.6 + 0.4 * (c.vigor ?? 1)) * (c.escudoPesado ? 0.82 : 1);
   return k;
 }
 function ordemCaca(a, b) {
@@ -4960,7 +4964,7 @@ function capacidades(c) {
 const capDe = c => { const s = saude(c); if (!s.cap) s.cap = capacidades(c); return s.cap; };
 const fatorMov = c => !c.saude || (!c.saude.feridas.length && !c.saude.perdidas.length && c.saude.sangue >= 100) ? 1 : clamp(capDe(c).movimento, 0.08, 1);
 const fatorTrab = c => !c.saude || (!c.saude.feridas.length && !c.saude.perdidas.length && c.saude.sangue >= 100) ? 1 : clamp(capDe(c).manipulacao * (0.55 + 0.45 * capDe(c).consciencia), 0.1, 1);
-const fatorMira = c => !c.saude ? 1 : clamp((0.45 + 0.55 * capDe(c).visao) * (0.5 + 0.5 * capDe(c).manipulacao), 0.15, 1);
+const fatorMira = c => !c.saude ? 1 : clamp((0.45 + 0.55 * capDe(c).visao) * (0.5 + 0.5 * capDe(c).manipulacao) * (0.65 + 0.35 * (c.vigor ?? 1)), 0.15, 1);
 /* ---------------- dano: escolher a parte pela cobertura, penetrar, destruir ---------------- */
 const PESO_ALTURA = { baixo: { perna: 2.4, pe: 2.4, mao: 1.2, braco: 1.2, torso: 0.6, cabeca: 0.25 }, alto: { torso: 1.3, cabeca: 1.6, braco: 1.2, mao: 1, perna: 0.6, pe: 0.35 } };
 function escolherParte(c, alt) {
@@ -5130,7 +5134,7 @@ function ferir(c, parte, tipo, sev, origem) { // compatível com a v8: gravidade
   if (tipo === 'mordida' || tipo === 'corte') { /* ok */ }
   return aplicarDano(c, parte, tipo, clamp(sev, 0.05, 1) * A.partes[parte].hp * 0.9, origem);
 }
-const BASE_INFEC = f => (FERIDA[f.tipo].infec || 0) * 0.6;
+const BASE_INFEC = f => (FERIDA[f.tipo].infec || 0) * 0.42; // v11: 0,6 → 0,42 (colônias morriam em ~4 dias)
 function atualizarSaude(c, horas) {
   const s = saude(c); if (s.morto) return;
   if (!s.feridas.length && s.sangue >= 100) { if (s.dor) { s.dor = 0; s.cap = null; } if (s.caido) recalcularSaude(c); return; }
@@ -5149,7 +5153,7 @@ function atualizarSaude(c, horas) {
       const tq = f.infTrat && agora() - f.infT < 720 ? f.infTrat : 0;
       if (!f.immK) f.immK = 0.88 + rnd() * 0.42; // cada corpo reage diferente
       f.infec = clamp(f.infec + horas * (0.03 - 0.028 * tq), 0, 1);
-      f.imune = clamp(f.imune + horas * 0.0285 * f.immK * (camaReal ? 1.2 : repouso ? 1.1 : 1) * (c.fome !== undefined && c.fome < 20 ? 0.75 : 1), 0, 1);
+      f.imune = clamp(f.imune + horas * 0.0325 * f.immK * (camaReal ? 1.2 : repouso ? 1.1 : 1) * (c.fome !== undefined && c.fome < 20 ? 0.75 : 1), 0, 1);
       if (f.imune >= 1) { f.infec = 0; f.infCurada = true; f.infTrat = 0; st10('infeccoesCuradas'); if (!c.animal) log(`${c.nome} ganhou a corrida contra a infecção (imunidade completa).`, 'bom'); }
       else if (f.infec >= 1) { st10('mortesInfeccao'); return morrer(c, 'infecção'); }
       mudou = true;
@@ -5254,9 +5258,11 @@ function pernaMancaAnimal(a) { // perna mais machucada (0..3) e quanto manca
 }
 function golpeAnimal(a, c) { // animal ataca colono: mordida (lobo, baixo) ou garra/patada (urso, alto)
   const v = visDe(c);
-  if (c.escudo && rnd() < 0.42) { v.bloqueio = 0.5; st10('bloqueios'); faiscasEscudo(c, a); return; }
+  if (rnd() < v11Cobertura(c, a) * 0.5) { st11('coberturaSalvou'); return; }
+  if (c.escudo && rnd() < v11Bloqueio(c)) { v.bloqueio = 0.5; st10('bloqueios'); faiscasEscudo(c, a); return; }
   if (rnd() > (a.esp === 'urso' ? 0.7 : 0.55) * (0.6 + 0.4 * fatorMovAnimal(a))) return; // errou
   st10('ataques');
+  if (c.form11 && V11.forms[c.form11] && V11.forms[c.form11].membros.some(o => o !== c && Math.hypot(o.x - c.x, o.y - c.y) < 1.8) && rnd() < 0.25) { st11('formacaoAmorteceu'); return; } // aliado ao lado apara parte dos golpes
   if (a.esp === 'urso') { const q = rnd(); if (q < 0.55) golpear(c, q < 0.2 ? 'arranhao' : 'corte', 8 + rnd() * 10, 'garras do urso', { alt: 'alto' }); else golpear(c, 'contusao', 7 + rnd() * 10, 'patada do urso', { alt: 'alto' }); }
   else if (a.esp === 'lobo') { if (rnd() < 0.8) golpear(c, 'mordida', 4.5 + rnd() * 6, 'mordida de lobo', { alt: 'baixo' }); else golpear(c, 'arranhao', 3 + rnd() * 4, 'lobo', { alt: 'baixo' }); }
   else golpear(c, 'contusao', 4 + rnd() * 6, 'chifrada', {});
@@ -5267,7 +5273,7 @@ function golpearAnimal(c, a, tp) {
   if (tp === 'arco') {
     if (c.flechas <= 0) return;
     c.flechas--; st10('flechas');
-    const acerta = rnd() < clamp((0.88 - d * 0.04 - (a.vel > 2.2 ? 0.18 : 0) - (saude(c).dor * 0.2)) * fatorMira(c), 0.15, 0.92);
+    const acerta = rnd() < clamp((0.88 + v11Cobertura(c, a) * 0.3 - d * (c.arcoLongo ? 0.028 : 0.04) - (a.vel > 2.2 ? 0.18 : 0) - (saude(c).dor * 0.2)) * fatorMira(c), 0.15, 0.92);
     const ex = acerta ? 0 : (rnd() - 0.5) * 2.4, ey = acerta ? 0 : (rnd() - 0.5) * 2.4;
     projeteis.push({ x0: c.x, y0: c.y, x1: a.x + ex, y1: a.y + ey, t: 0, dur: Math.max(0.12, d / 17), presa: a, acerta, dano: 11 + rnd() * 6, autor: c });
     a.alerta = 1.2; return;
@@ -6233,6 +6239,7 @@ function passoSimulacao(dtReal) {
   for (const c of colonos) atualizarColono(c, dt, minutos / 60);
   for (const v of visitantes.slice()) atualizarVisitante(v, dt);
   atualizarV8(dt, minutos);
+  v11Tick(dt);
   atualizarDev();
   atualizarConversas(dt);
   atualizarQuedas(dt);
@@ -6267,9 +6274,456 @@ function quadro(t) {
   if (Q.particulas) atualizarParticulas(estado.pausado ? 0 : dtReal * Math.min(estado.velocidade, 2));
   render(dtReal);
   uiAcum += dtReal;
-  if (uiAcum > 0.15) { atualizarUI(); uiAcum = 0; }
+  if (uiAcum > 0.15) { atualizarUI(); v11Barra(); uiAcum = 0; }
   requestAnimationFrame(quadro);
 }
+/* =====================================================================
+   v11 — COMBATE TÁTICO: formação (linha / quadrado / teto de escudos), papéis,
+   IA de utilidade, moral e pânico, cobertura, prioridade de alvo, vigor,
+   equipamento pesado/longo, resgate para dentro do quadrado e bandidos (modo dev).
+   Todo dano continua passando por golpear() (saúde por partes da v10).
+   ===================================================================== */
+const ARMAS = { espada: { nome: 'Espada' }, arco: { nome: 'Arco' }, lanca: { nome: 'Lança' } }; // (faltava na v10: textoEquip quebrava ao inspecionar colono armado)
+const V11 = { forms: {}, ordem: { modo: null, teto: null }, idGrupo: 0, frame: 0 };
+const st11 = (k, n = 1) => { const s = estado.stats.v11 || (estado.stats.v11 = {}); s[k] = (s[k] || 0) + n; };
+const NOME_PAPEL = { frente: 'Linha de frente', arqueiro: 'Arqueiro (retaguarda)', flanco: 'Flanco', reserva: 'Reserva', interno: 'Protegido(a) no quadrado' };
+const NOME_ACAO11 = { segurar: 'segurando a posição', atacar: 'atacando', atirar: 'atirando', recuar: 'recuando ferido(a)', reagrupar: 'reagrupando' };
+const bandidos = () => visitantes.filter(v => v.bandido);
+ITEM.ESCUDO_PESADO = { nome: 'Escudo pesado', max: 1, equip: 'escudo' };
+ITEM.ARCO_LONGO = { nome: 'Arco longo', max: 1, equip: 'arma' };
+RECEITAS.ESCUDO_PESADO = { nome: 'Escudo pesado (lento, segura a linha)', custo: { MADEIRA: 10, PEDRA: 8 }, tempo: 160 };
+RECEITAS.ARCO_LONGO = { nome: 'Arco longo (alcance maior)', custo: { MADEIRA: 14 }, tempo: 170 };
+function v11Valido(a) {
+  if (!a) return false;
+  if (a.animal) return !a.morto && animais.includes(a);
+  return (colonos.includes(a) || visitantes.includes(a)) && !saude(a).morto && !saude(a).caido;
+}
+function v11Papel(c) {
+  if (c.arma === 'arco' && c.flechas > 0) return 'arqueiro';
+  if (c.escudo || c.arma === 'lanca') return 'frente';
+  if (c.arma || (c.ferramentas && (c.ferramentas.machado || c.ferramentas.picareta))) return 'flanco';
+  return 'reserva';
+}
+const v11Armado = c => !!(c.arma || (c.ferramentas && (c.ferramentas.machado || c.ferramentas.picareta)));
+function v11Cobertura(c, de) {
+  if (!de) return 0;
+  const dx = de.x - c.x, dy = de.y - c.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d, cx = Math.round(c.x), cy = Math.round(c.y);
+  let m = 0;
+  for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) {
+    if ((!ox && !oy) || (ox * ux + oy * uy) / Math.hypot(ox, oy) < 0.5) continue;
+    const x = cx + ox, y = cy + oy; if (!dentro(x, y)) continue;
+    const i = idx(x, y); let v = mapa.arvore[i] ? 0.3 : 0;
+    if (mapa.terreno[i] === TERRENO.ROCHA || bloqueiaEstr(mapa.estrutura[i])) v = 0.45;
+    if (v > m) m = v;
+  }
+  return d < 1.3 ? m * 0.5 : m;
+}
+function v11Bloqueio(c, deFlecha) {
+  if (!c.escudo) return 0;
+  const F = c.form11 && V11.forms[c.form11];
+  let b = c.escudoPesado ? 0.58 : 0.42;
+  if (c.papel11 === 'frente' && F && F.membros.some(o => o !== c && o.escudo && Math.hypot(o.x - c.x, o.y - c.y) < 1.7)) b += 0.1; // parede de escudos
+  if (c.guarda11) b += 0.05;
+  if (deFlecha && F && F.teto) b += 0.25;
+  return Math.min(0.9, b);
+}
+function v11Vigor(c, dt) {
+  if (c.vigor === undefined) c.vigor = 1;
+  const t = c.tarefa, luta = t && t.tipo === 'lutar';
+  let r;
+  if (luta && t.fase === 'fazendo') r = -0.011 * (c.escudoPesado ? 1.3 : 1);
+  else if (luta || (t && t.tipo === 'fugir')) r = c.vel > 0.3 ? -0.0045 * (c.escudoPesado ? 1.3 : 1) : (c.guarda11 ? -0.001 : 0.006);
+  else r = c.dormindo || c.sentado || (saude(c).caido) ? 0.045 : 0.022;
+  c.vigor = clamp(c.vigor + r * dt, 0.15, 1);
+  if (r < 0) st11('vigorGasto'); 
+}
+function v11Aliados(e) { return e.bandido ? bandidos().filter(b => b.grupo11 === e.grupo11) : colonos; }
+function v11InimigosDe(c) {
+  if (c.bandido) return colonos.filter(o => !saude(o).caido && !o.carregadoPor);
+  const l = animais.filter(a => !a.morto && a.estado === 'atacar' && colonos.includes(a.alvo));
+  for (const b of bandidos()) if (!saude(b).caido && !b.partindo) l.push(b);
+  return l;
+}
+function v11ScoreAlvo(c, e) {
+  const d = Math.hypot(e.x - c.x, e.y - c.y); let s = -d * 0.12;
+  if (e.animal) { const E = ESP_ANIMAL[e.esp]; s += (1 - e.hp / E.hp) * 1.5; if (e.esp === 'urso') s += 0.5; if (e.saude && e.saude.caido) s -= 0.5; }
+  else { const sa = saude(e); s += (sa.dor || 0) * 1.2 + perdaSangue(e) / 80; if (e.arma === 'arco') s += 0.6; else if (e.arma) s += 0.4; if (e.escudo) s -= 0.25; if (e.dentro11 && e.form11 && V11.forms[e.form11] && V11.forms[e.form11].teto) s -= 0.6; }
+  const amigos = e.animal ? animais.filter(o => o !== e && !o.morto && o.bando === e.bando) : v11Aliados(e).filter(o => o !== e);
+  if (!amigos.some(o => Math.hypot(o.x - e.x, o.y - e.y) < 3)) s += 0.7; // isolado
+  if (c.arma !== 'arco' && d < 2) s += 0.8; // corpo a corpo prefere quem está ao alcance
+  return s;
+}
+function v11EscolherAlvo(c, atual) {
+  let mel = v11Valido(atual) ? atual : null, ms = mel ? v11ScoreAlvo(c, mel) + 0.3 : -1e9;
+  for (const e of v11InimigosDe(c)) { if (e === atual || Math.hypot(e.x - c.x, e.y - c.y) > 16) continue; const s = v11ScoreAlvo(c, e); if (s > ms) { ms = s; mel = e; } }
+  return mel;
+}
+function v11InimigoPerto(c) { let m = null, md = 1e9; for (const e of v11InimigosDe(c)) { const d = Math.hypot(e.x - c.x, e.y - c.y); if (d < md) { md = d; m = e; } } return m; }
+function v11Panico(c, base, motivo) {
+  if (c.panico11 > agora() || saude(c).caido || saude(c).morto) return false;
+  let ch = base * (1.35 - (c.humor ?? 60) / 100) * (1 + (saude(c).dor || 0)) * (c.escudoPesado ? 0.55 : 1) * (c.bandido ? 1.25 : 1) * (c.form11 && V11.forms[c.form11] && V11.forms[c.form11].modo === 'quadrado' ? 0.6 : 1);
+  if (V11.forcarPanico) ch = 1;
+  if (rnd() >= ch) return false;
+  c.panico11 = agora() + 20; st11('panicos');
+  if (!c.bandido) memorizar(c, 'panico', 'Entrou em pânico no combate', -6, 12);
+  log(`😱 ${c.nome} entrou em pânico (${motivo}) e foge!`, 'ruim');
+  const e = v11InimigoPerto(c);
+  if (c.bandido) v11BandidoParte(c); else if (e) iniciarFuga(c, e);
+  return true;
+}
+function v11Choque(c, raio, base, motivo) { // morte/queda de alguém mexe com a moral dos aliados próximos
+  const lado = c.bandido ? bandidos() : c.animal ? [] : colonos;
+  for (const o of lado) if (o !== c && Math.hypot(o.x - c.x, o.y - c.y) < raio && ((o.tarefa && o.tarefa.tipo === 'lutar') || o.bandido)) v11Panico(o, base, motivo);
+}
+function v11Tile(x, y) { const tx = clamp(Math.round(x), 0, mapa.L - 1), ty = clamp(Math.round(y), 0, mapa.A - 1); return passavel(tx, ty) ? { x: tx, y: ty } : (livrePerto(tx, ty) || { x: tx, y: ty }); }
+/* ---------- formação (linha ou quadrado) por lado ---------- */
+function v11Membros(lado) {
+  if (lado === 'c') return colonos.filter(c => { const t = c.tarefa; return t && t.tipo === 'lutar' && !t.cacada && !t.job && !saude(c).caido && !(c.panico11 > agora()); });
+  return bandidos().filter(b => 'b' + b.grupo11 === lado && !saude(b).caido && !b.partindo && b.tarefa && b.tarefa.tipo === 'lutar');
+}
+function v11Formar(lado, dt) {
+  const m = v11Membros(lado);
+  const ini = m.length ? v11InimigosDe(m[0]) : [];
+  let F = V11.forms[lado];
+  if (m.length < 2 || !ini.length) { if (F) { for (const c of F.membros) { c.slot11 = null; c.papel11 = null; c.form11 = null; c.dentro11 = false; c.guarda11 = 0; } delete V11.forms[lado]; } return; }
+  const cx = m.reduce((s, c) => s + c.x, 0) / m.length, cy = m.reduce((s, c) => s + c.y, 0) / m.length;
+  const perto = ini.filter(e => Math.hypot(e.x - cx, e.y - cy) < 26); const alvoL = perto.length ? perto : ini;
+  const ex = alvoL.reduce((s, e) => s + e.x, 0) / alvoL.length, ey = alvoL.reduce((s, e) => s + e.y, 0) / alvoL.length;
+  const papeis = new Map(m.map(c => [c, v11Papel(c)]));
+  if (!F) {
+    const fr = m.filter(c => papeis.get(c) === 'frente'), b = fr.length ? fr : m;
+    F = V11.forms[lado] = { lado, ax: b.reduce((s, c) => s + c.x, 0) / b.length, ay: b.reduce((s, c) => s + c.y, 0) / b.length, n0: 0, quebrada: 0, modo: 'linha', teto: false, kTeto: 0, kForm: 0, flechas: [], decT: 0, membros: m, criado: agora() };
+    st11('formacoes'); log(`${lado === 'c' ? 'Os colonos' : 'Os bandidos'} entram em formação (${m.length}).`, lado === 'c' ? 'bom' : 'ruim');
+  }
+  F.membros = m; F.kForm = Math.min(1, F.kForm + dt * 0.8);
+  // ---- decisão automática do grupo (ou ordem do jogador) ----
+  F.decT -= dt;
+  F.flechas = F.flechas.filter(q => agora() - q < 20);
+  const escudos = m.filter(c => c.escudo).length;
+  const feridosFora = (lado === 'c' ? colonos : bandidos().filter(b => 'b' + b.grupo11 === lado)).filter(o => saude(o).caido && !o.carregadoPor && !o.resgatador && Math.hypot(o.x - F.ax, o.y - F.ay) < 12 && Math.hypot(o.x - F.ax, o.y - F.ay) > 1.6);
+  if (F.decT <= 0) {
+    F.decT = 1;
+    const arqIni = alvoL.filter(e => e.arma === 'arco' && e.flechas > 0).length;
+    let lados = 0; { const s = new Set(); for (const e of alvoL) s.add(Math.round(Math.atan2(e.y - F.ay, e.x - F.ax) / (Math.PI / 2))); lados = s.size; }
+    const o = lado === 'c' ? V11.ordem : {};
+    const querQuad = escudos >= 3 && (arqIni >= 2 || F.flechas.length >= 3 || feridosFora.length > 0 || lados >= 3);
+    const modo = o.modo || (querQuad ? 'quadrado' : 'linha');
+    if (modo !== F.modo) { F.modo = modo; F.kForm = 0; st11('modo_' + modo); log(`${lado === 'c' ? 'Colonos' : 'Bandidos'}: ${modo === 'quadrado' ? 'formar quadrado!' : 'formar linha!'}`); }
+    const teto = o.teto ?? (F.modo === 'quadrado' && (F.flechas.length >= 2 || arqIni >= 2));
+    if (teto !== F.teto) { F.teto = teto; if (teto) { st11('teto'); log(`${lado === 'c' ? 'Colonos' : 'Bandidos'} erguem o teto de escudos!`); } }
+    if ((o.resgatar || feridosFora.length) && feridosFora.length) v11Resgatar(F, feridosFora[0]);
+    if (o.resgatar) o.resgatar = false;
+  }
+  F.kTeto += ((F.teto ? 1 : 0) - F.kTeto) * Math.min(1, dt * 2.5);
+  // ---- base (âncora) e direção ----
+  let dx = ex - F.ax, dy = ey - F.ay; const d = Math.hypot(dx, dy) || 1; const ux = dx / d, uy = dy / d, px = -uy, py = ux;
+  Object.assign(F, { ux, uy, px, py, ex, ey });
+  const P = (c, i, j, papel, dentro) => { c.slot11 = v11Tile(F.ax + ux * i + px * j, F.ay + uy * i + py * j); c.papel11 = papel; c.form11 = lado; c.dentro11 = !!dentro; };
+  const proj = c => c.x * px + c.y * py;
+  const fr = m.filter(c => papeis.get(c) === 'frente').sort((a, b) => proj(a) - proj(b));
+  const arq = m.filter(c => papeis.get(c) === 'arqueiro').sort((a, b) => proj(a) - proj(b));
+  const fl = m.filter(c => papeis.get(c) === 'flanco').sort((a, b) => proj(a) - proj(b));
+  const res = m.filter(c => papeis.get(c) === 'reserva');
+  let linha;
+  if (F.modo === 'quadrado') {
+    const muro = fr.concat(fl), dentroL = arq.concat(res);
+    const R = dentroL.length > 1 || muro.length > 8 ? 2 : 1, anel = [];
+    for (let i = -R; i <= R; i++) for (let j = -R; j <= R; j++) if (Math.max(Math.abs(i), Math.abs(j)) === R) anel.push([i, j]);
+    anel.sort((a, b) => (b[0] - a[0]) || (Math.abs(a[1]) - Math.abs(b[1]))); // frente primeiro, depois lados, por fim atrás
+    // espalha os escudos pelos 4 lados: frente, esquerda, direita, trás
+    const ordemLados = [], porLado = { f: anel.filter(p => p[0] === R).sort((a, b) => Math.abs(a[1]) - Math.abs(b[1])), e: anel.filter(p => p[1] === -R && p[0] !== R).sort((a, b) => Math.abs(a[0]) - Math.abs(b[0])), dd: anel.filter(p => p[1] === R && p[0] !== R).sort((a, b) => Math.abs(a[0]) - Math.abs(b[0])), t: anel.filter(p => p[0] === -R && Math.abs(p[1]) !== R).sort((a, b) => Math.abs(a[1]) - Math.abs(b[1])) };
+    for (let k = 0; ordemLados.length < anel.length; k++) for (const L of ['f', 'e', 'dd', 't']) if (porLado[L][k]) ordemLados.push(porLado[L][k]);
+    muro.forEach((c, n) => { const p = ordemLados[n % ordemLados.length]; P(c, p[0], p[1], 'frente'); });
+    const dentroPos = []; for (let i = -(R - 1); i <= R - 1; i++) for (let j = -(R - 1); j <= R - 1; j++) dentroPos.push([i, j]);
+    dentroL.forEach((c, n) => { const p = dentroPos[n % dentroPos.length]; P(c, p[0], p[1], papeis.get(c) === 'arqueiro' ? 'arqueiro' : 'interno', true); });
+    F.R = R; linha = muro; F.centro = v11Tile(F.ax, F.ay);
+  } else {
+    linha = fr.length ? fr : fl.splice(0, Math.min(fl.length, 2)).sort((a, b) => proj(a) - proj(b));
+    linha.forEach((c, n) => P(c, 0, (n - (linha.length - 1) / 2) * 1.1, 'frente'));
+    const atras = 2 + (arq.some(c => c.arcoLongo) ? 1 : 0.5);
+    arq.forEach((c, n) => { // retaguarda, de preferência atrás de cobertura
+      P(c, -atras, (n - (arq.length - 1) / 2) * 1.4, 'arqueiro');
+      let mel = c.slot11, ms = -1;
+      for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) { const x = c.slot11.x + ox, y = c.slot11.y + oy; if (!passavel(x, y)) continue; const s = v11Cobertura({ x, y }, { x: ex, y: ey }) - 0.12 * Math.hypot(ox, oy); if (s > ms) { ms = s; mel = { x, y }; } }
+      c.slot11 = mel;
+    });
+    const w = (linha.length - 1) / 2 * 1.1 + 1.4;
+    fl.forEach((c, n) => { const s = n % 2 ? -1 : 1, r = w + Math.floor(n / 2) * 1.1; P(c, 0.4, s * r, 'flanco'); });
+    res.forEach((c, n) => P(c, -1.5, (n - (res.length - 1) / 2) * 1.2, 'reserva'));
+    F.centro = null;
+  }
+  F.linha = linha;
+  F.formado = linha.length > 0 && linha.every(c => Math.hypot(c.x - c.slot11.x, c.y - c.slot11.y) < 0.9) && m.every(c => !c.slot11 || c.acao11 === 'atacar' || Math.hypot(c.x - c.slot11.x, c.y - c.slot11.y) < 1.6);
+  if (linha.length < F.n0) { F.quebrada = agora() + 15; st11('linhaRompida'); log(`A ${F.modo === 'quadrado' ? 'formação' : 'linha'} ${lado === 'c' ? 'dos colonos' : 'dos bandidos'} se rompeu!`, 'ruim'); for (const o of m) v11Panico(o, 0.22, 'linha rompida'); }
+  F.n0 = linha.length;
+  // ---- avanço mantendo a formação ----
+  const dmin = Math.min(...alvoL.map(e => Math.hypot(e.x - F.ax, e.y - F.ay)));
+  F.avancando = false;
+  if (F.formado && dmin > (F.modo === 'quadrado' ? 3 : 2.4)) {
+    const v = 0.6 * dt * (linha.some(c => c.escudoPesado) ? 0.8 : 1) * (F.teto ? 0.55 : 1) * (F.modo === 'quadrado' ? 0.7 : 1);
+    const nx = F.ax + ux * v, ny = F.ay + uy * v; if (passavel(Math.round(nx), Math.round(ny))) { F.ax = nx; F.ay = ny; F.avancando = true; st11('avanco'); }
+  }
+}
+function v11Resgatar(F, p) {
+  if (!F.centro && F.modo !== 'quadrado') { if (F.lado === 'c' && !V11.ordem.modo) { F.modo = 'quadrado'; F.kForm = 0; } return; }
+  const cent = F.centro || v11Tile(F.ax, F.ay);
+  const cands = F.membros.filter(c => !saude(c).caido && (saude(c).dor || 0) < 0.45 && c.arma !== 'arco' && !c.bandido).sort((a, b) => (a.papel11 === 'frente') - (b.papel11 === 'frente') || Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y));
+  const c = cands[0]; if (!c) return;
+  cancelar(c); p.resgatador = c;
+  c.tarefa = { tipo: 'resgatar', paciente: p, estilo: 'arrastar', fase: 'indo', t: 0, rp: 0, cama11: { x: cent.x, y: cent.y, real: false }, estilo11: 'arrastar' };
+  c.caminho = []; st11('resgates'); log(`${c.nome} sai da formação para arrastar ${p.nome} para dentro do quadrado!`, 'bom');
+}
+/* ---------- utilidade por unidade ---------- */
+function v11Decidir(c, t) {
+  const F = c.form11 && V11.forms[c.form11], papel = c.papel11 || v11Papel(c), s = saude(c);
+  const W = { frente: [1.0, 0.35, 0], arqueiro: [0.3, 0.1, 1], flanco: [0.45, 0.85, 0], reserva: [0.6, 0.3, 0], interno: [0.9, 0.05, 0] }[papel];
+  const ferido = (s.dor || 0) * 1.3 + (1 - capDe(c).movimento) * 1.2 + perdaSangue(c) / 55 + (1 - (c.vigor ?? 1)) * 0.35 + (papel === 'arqueiro' ? 0.08 : 0);
+  const dSlot = c.slot11 ? Math.hypot(c.x - c.slot11.x, c.y - c.slot11.y) : 0, quebrada = F && F.quebrada > agora();
+  const sc = {
+    segurar: F ? W[0] * (c.escudoPesado ? 1.3 : 1) + 0.2 : 0,
+    atacar: W[1] + (F ? 0 : 0.5) + (quebrada && papel === 'flanco' ? 0.2 : 0),
+    atirar: papel === 'arqueiro' ? W[2] * (F && F.formado ? 1 : 0.6) + (F ? 0 : 0.3) : 0,
+    recuar: ferido > (F && F.modo === 'quadrado' && c.dentro11 ? 0.95 : 0.6) ? 0.65 + ferido : 0,
+    reagrupar: F && dSlot > 2.5 ? 0.5 + (quebrada ? 0.5 : 0) + dSlot * 0.08 : 0,
+  };
+  let mel = 'atacar'; for (const k in sc) if (sc[k] > sc[mel]) mel = k;
+  if (mel !== c.acao11) st11('acao_' + mel);
+  c.acao11 = mel; c.util11 = sc;
+}
+function v11Lutar(c, t, dt) {
+  if (c.panico11 > agora()) { const a = t.presa; fim(c); if (c.bandido) v11BandidoParte(c); else iniciarFuga(c, a); return true; }
+  c.dec11 = (c.dec11 || 0) - dt;
+  if (c.dec11 <= 0) {
+    c.dec11 = 0.35;
+    const novo = v11EscolherAlvo(c, t.presa); if (novo && novo !== t.presa) { t.presa = novo; t.ini = agora(); st11('trocaAlvo'); }
+    v11Decidir(c, t);
+  }
+  const a = t.presa; if (!v11Valido(a)) return false;
+  const arco = c.arma === 'arco' && c.flechas > 0, alc = arco ? (c.arcoLongo ? 10 : 7.5) : (a.saude && a.saude.caido ? 2.1 : 1.9);
+  const d = Math.hypot(a.x - c.x, a.y - c.y);
+  switch (c.acao11) {
+    case 'recuar': fim(c); st11('recuos'); log(`${c.nome} está ferido(a) e recua da ${c.form11 ? 'formação' : 'luta'}.`, 'ruim'); c.guarda11 = 0; if (c.bandido) v11BandidoParte(c); else iniciarFuga(c, a); return true;
+    case 'segurar': case 'reagrupar': case 'atirar': {
+      if (!c.slot11) return false;
+      const dSlot = Math.hypot(c.x - c.slot11.x, c.y - c.slot11.y);
+      if (c.acao11 !== 'reagrupar' && dSlot < 1.0 && d <= alc && (!arco || linhaDeVisao(c, a))) { c.guarda11 = c.escudo ? 0.5 : 0; return false; } // ao alcance: golpeia/atira da posição
+      if (dSlot > 0.55) {
+        if ((t.rp11 = (t.rp11 || 0) - dt) <= 0 || !c.caminho.length) { t.rp11 = 0.5; const s = tileDe(c), cam = aEstrela(s.x, s.y, c.slot11.x, c.slot11.y); c.caminho = cam || []; }
+        t.fase = 'posicionar'; c.guarda11 = 0; return true;
+      }
+      c.caminho = []; t.fase = 'segurar'; virarPara(c, a.x, a.y); c.guarda11 = c.escudo ? 1 : 0; return true;
+    }
+  }
+  c.guarda11 = 0; return false;
+}
+/* ---------- bandidos (só pelo modo dev) ---------- */
+const NOMES_BAND = ['Corvo', 'Faca', 'Zeca Dente', 'Brasa', 'Tição', 'Lobo Velho', 'Cicatriz', 'Mão Torta', 'Rato', 'Caolho', 'Pedra', 'Navalha'];
+function criarBandido(x, y, papel, grupo, extra = {}) {
+  const so = l => l[Math.floor(rnd() * l.length)];
+  const b = { nome: so(NOMES_BAND) + ' (bandido)', pele: so(CORES_PELE), cabelo: so(CORES_CABELO), roupa: so(['#5a2a2a', '#3a3a3a', '#6a4a2a', '#4a2a3a']), estilo: so(['curto', 'longo', 'coque']), barba: rnd() < 0.6, leve: false, bandido: true, grupo11: grupo,
+    x, y, ax: x, ay: y, dist: 0, adist: 0, vel: 0, avel: 0, yawAlvo: 0, yawVis: 0, mola: { y: 0, v: 0 }, piscaT: 3, dir: DIR.BAIXO, andando: false, caminho: [],
+    opiniao: {}, memorias: [], balao: null, cdConversa: 999, dormindo: false, tarefa: null, carregando: null, acaoF: 0, aAcaoF: 0, ferramentas: { machado: false, picareta: false }, prioridades: {},
+    fome: 80, sono: 80, humor: 45, saude: novaSaude(), arma: null, escudo: false, flechas: 0, vigor: 1, pensarT: 0, ...extra };
+  if (papel === 'escudo') { b.arma = 'espada'; b.escudo = true; } else if (papel === 'arqueiro') { b.arma = 'arco'; b.flechas = 20; } else b.arma = 'espada';
+  visitantes.push(b); return b;
+}
+const GRUPOS_BAND = { pequeno: ['escudo', 'arqueiro', 'espada'], medio: ['escudo', 'escudo', 'arqueiro', 'arqueiro', 'espada'], grande: ['escudo', 'escudo', 'escudo', 'escudo', 'arqueiro', 'arqueiro', 'arqueiro', 'espada', 'espada'] };
+function spawnBandidos(tam, x, y) {
+  const g = ++V11.idGrupo, l = [];
+  GRUPOS_BAND[tam].forEach((p, n) => { const q = livrePerto(x + (n % 3) - 1, y + Math.floor(n / 3)) || { x, y }; const b = criarBandido(q.x, q.y, p, g); if (tam === 'grande' && n === 0) b.escudoPesado = true; if (tam === 'grande' && n === 4) b.arcoLongo = true; l.push(b); });
+  st11('bandidos', l.length); log(`⚔ Um bando de ${l.length} bandidos (${tam}) ataca a colônia!`, 'ruim');
+  return l;
+}
+function v11BandidoParte(b) {
+  if (b.partindo) return; b.partindo = true; fim(b);
+  const s = tileDe(b); let mel = null, md = 1e9;
+  for (const [x, y] of [[0, s.y], [mapa.L - 1, s.y], [s.x, 0], [s.x, mapa.A - 1]]) { const dd = Math.hypot(x - s.x, y - s.y); if (dd < md && chaoFirme(x, y)) { md = dd; mel = { x, y }; } }
+  const alvo = mel || lugarLonge(0, true); b.caminho = (alvo && aEstrela(s.x, s.y, alvo.x, alvo.y)) || [];
+  log(`${b.nome} foge do combate.`, 'bom'); st11('bandidosFugiram');
+}
+function atualizarBandido(b, dt) {
+  const horas = dt * CONFIG.MIN_JOGO_POR_SEG / 60, s = saude(b);
+  atualizarSaude(b, horas); if (s.morto || !visitantes.includes(b)) return;
+  v11Vigor(b, dt);
+  if (b.anim) { b.anim.t += dt; if (b.anim.t >= b.anim.dur) b.anim = null; else { b.vel = 0; return; } }
+  if (s.caido) { b.vel = 0; b.caminho = []; if (b.tarefa) b.tarefa = null; return; }
+  if (b.partindo) { if (!b.caminho.length) { removerVisitante(b); return; } mover(b, dt, 1.05 * fatorMovTotal(b)); return; }
+  if (b.tarefa && b.tarefa.tipo === 'fugir') { v11BandidoParte(b); return; }
+  if (!b.tarefa || b.tarefa.tipo !== 'lutar' || !v11Valido(b.tarefa.presa)) {
+    let mel = null, ms = -1e9; for (const c of v11InimigosDe(b)) { const sc = v11ScoreAlvo(b, c); if (sc > ms) { ms = sc; mel = c; } }
+    if (!mel) { v11BandidoParte(b); return; }
+    b.tarefa = { tipo: 'lutar', presa: mel, fase: 'indo', rp: 0, falhas: 0, ini: agora() };
+  }
+  executarV8(b, dt, horas * 60);
+  mover(b, dt, fatorMovTotal(b));
+}
+function v11FerirHumano(h, dano, autor, tipo) {
+  if (saude(h).morto) return [];
+  const flecha = tipo === 'perfuracao' && autor && autor.arma === 'arco' && Math.hypot(autor.x - h.x, autor.y - h.y) > 2.5;
+  const v = visDe(h);
+  if (flecha && h.form11 && V11.forms[h.form11]) V11.forms[h.form11].flechas.push(agora());
+  if (flecha && h.dentro11 && h.form11 && V11.forms[h.form11] && V11.forms[h.form11].teto && rnd() < 0.8) { st11('tetoBloqueou'); faiscasEscudo(h, autor); return []; }
+  if (rnd() < v11Bloqueio(h, flecha)) { v.bloqueio = 0.5; st10('bloqueios'); st11('bloqueiosEscudo'); faiscasEscudo(h, autor || h); return []; }
+  const cob = v11Cobertura(h, autor); if (cob && rnd() < cob * (flecha ? 0.8 : 0.5)) { st11('coberturaSalvou'); return []; }
+  v.golpe = 0.3;
+  const fs = golpear(h, tipo, dano * 0.85, autor ? autor.nome : '', {});
+  st11('golpesHumanos');
+  if (h.bandido && autor && !h.partindo) { /* bandido revida */ }
+  return fs;
+}
+/* ---------- tick ---------- */
+function v11Tick(dt) {
+  for (const c of colonos) v11Vigor(c, dt);
+  // colonos reagem a bandidos
+  const bs = bandidos().filter(b => !saude(b).caido && !b.partindo);
+  if (bs.length) for (const c of colonos) {
+    const sc = saude(c); if (sc.caido || c.carregadoPor || c.panico11 > agora()) continue;
+    const tp = c.tarefa && c.tarefa.tipo; if (['lutar', 'fugir', 'resgatar', 'tratar', 'repousar', 'cacada', 'apoiado', 'paciente'].includes(tp)) continue;
+    let e = null, md = 18; for (const b of bs) { const d = Math.hypot(b.x - c.x, b.y - c.y); if (d < md) { md = d; e = b; } }
+    if (!e) continue;
+    if (v11Armado(c) && (sc.dor || 0) < 0.45) { lutar(c, e); log(`${c.nome} pega em armas contra ${e.nome}!`); } else if (md < 7) iniciarFuga(c, e);
+  }
+  // animais escolhem alvo (feridos, isolados, armas perigosas)
+  for (const a of animais) {
+    if (a.morto || a.estado !== 'atacar' || !a.alvo || a.atk > 0) continue;
+    if ((a.ret11 = (a.ret11 || 0) - dt) > 0) continue; a.ret11 = 1.5;
+    const sA = c => { const s = saude(c); let v = (s.dor || 0) * 1.5 + perdaSangue(c) / 60 - Math.hypot(c.x - a.x, c.y - a.y) * 0.1 + (c.arma === 'arco' ? 0.5 : c.arma ? 0.3 : 0) - (c.escudo ? 0.3 : 0) - (c.dentro11 ? 0.6 : 0); if (!colonos.some(o => o !== c && Math.hypot(o.x - c.x, o.y - c.y) < 3)) v += 0.8; return v; };
+    let mel = a.alvo, ms = colonos.includes(a.alvo) ? sA(a.alvo) + 0.35 : -1e9;
+    for (const c of colonos) { if (saude(c).caido || c.carregadoPor || Math.hypot(c.x - a.x, c.y - a.y) > 12) continue; const v = sA(c); if (v > ms) { ms = v; mel = c; } }
+    if (mel !== a.alvo) { a.alvo = mel; a.caminho = []; st11('animalTrocaAlvo'); }
+  }
+  const lados = new Set(['c']); for (const b of bandidos()) lados.add('b' + b.grupo11);
+  for (const k of Object.keys(V11.forms)) lados.add(k);
+  for (const l of lados) v11Formar(l, dt);
+}
+/* ---------- desenho ---------- */
+const COR_PAPEL = { frente: '#5aa0ff', arqueiro: '#6fd36f', flanco: '#ffb04a', reserva: '#b0b0b0', interno: '#e0e0ff' };
+function v11Overlay(g, k) {
+  for (const F of Object.values(V11.forms)) {
+    const S = (x, y) => mundoParaTela((x + 0.5) * T, (y + 0.5) * T), z = Math.hypot(S(1, 0).x - S(0, 0).x, S(1, 0).y - S(0, 0).y) / 1; // pixels por tile
+    const cor = F.lado === 'c' ? '90,160,255' : '255,80,70', a = 0.25 + 0.55 * F.kForm;
+    g.save(); g.lineWidth = 2 * k; g.setLineDash([6 * k, 5 * k]); g.lineDashOffset = -tempoReal * 20 * k;
+    if (F.modo === 'quadrado' && F.R) { // contorno do quadrado se fechando
+      const R = F.R + 0.5, e = 1.6 - 0.6 * suave(F.kForm), cs = [[R, R], [R, -R], [-R, -R], [-R, R]].map(([i, j]) => S(F.ax + (F.ux * i + F.px * j) * e, F.ay + (F.uy * i + F.py * j) * e));
+      g.beginPath(); cs.forEach((p, n) => n ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)); g.closePath(); g.strokeStyle = `rgba(${cor},${a})`; g.stroke();
+    } else if (F.linha && F.linha.length) {
+      const ps = F.linha.map(c => c.slot11).filter(Boolean).sort((p, q) => (p.x * F.px + p.y * F.py) - (q.x * F.px + q.y * F.py)).map(p => S(p.x, p.y));
+      if (ps.length > 1) { g.beginPath(); ps.forEach((p, n) => n ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y)); g.strokeStyle = `rgba(${cor},${a})`; g.stroke(); }
+      if (F.avancando) { const p = S(F.ax + F.ux * 1.6, F.ay + F.uy * 1.6), q = S(F.ax + F.ux * 2.6, F.ay + F.uy * 2.6); g.setLineDash([]); g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(q.x, q.y); g.strokeStyle = `rgba(${cor},0.8)`; g.lineWidth = 3 * k; g.stroke(); }
+    }
+    g.setLineDash([]);
+    for (const c of F.membros) { // posição (fantasma) e linha pontilhada de quem ainda está indo / reagrupando
+      if (!c.slot11) continue; const p = S(c.slot11.x, c.slot11.y), q = S(c.rx ?? c.x, c.ry ?? c.y);
+      g.beginPath(); g.ellipse(p.x, p.y + z * 0.25, z * 0.32, z * 0.14, 0, 0, 7); g.strokeStyle = COR_PAPEL[c.papel11] || '#fff'; g.globalAlpha = 0.35 + 0.4 * F.kForm; g.lineWidth = 1.5 * k; g.stroke();
+      if (Math.hypot(p.x - q.x, p.y - q.y) > z * 0.6) { g.setLineDash([2 * k, 4 * k]); g.beginPath(); g.moveTo(q.x, q.y + z * 0.25); g.lineTo(p.x, p.y + z * 0.25); g.stroke(); g.setLineDash([]); }
+      g.globalAlpha = 1;
+    }
+    if (F.kTeto > 0.02 && F.modo === 'quadrado' && F.R) { // teto de escudos: placas de madeira sobrepostas que sobem
+      const R = F.R + 0.35, lift = (1 - F.kTeto) * z * 0.8;
+      g.globalAlpha = 0.5 * F.kTeto;
+      for (let i = -F.R; i <= F.R; i++) for (let j = -F.R; j <= F.R; j++) {
+        const p = S(F.ax + F.ux * i * 0.95 + F.px * j * 0.95, F.ay + F.uy * i * 0.95 + F.py * j * 0.95), w = Math.sin(tempoReal * 2 + i + j) * z * 0.02;
+        g.beginPath(); g.ellipse(p.x, p.y - z * 0.75 + lift + w, z * 0.44, z * 0.3, 0, 0, 7); g.fillStyle = (i + j) & 1 ? '#a8763f' : '#946632'; g.fill();
+        g.lineWidth = 1.5 * k; g.strokeStyle = '#3a2410'; g.stroke(); g.beginPath(); g.arc(p.x, p.y - z * 0.75 + lift + w, z * 0.09, 0, 7); g.fillStyle = '#c9c0a8'; g.fill();
+      }
+      g.globalAlpha = 1; void R;
+    }
+    g.restore();
+  }
+  for (const c of colonos.concat(bandidos())) { // marcador de papel + pânico + vigor
+    const wx = (c.rx ?? c.x) * T + T / 2, wy = (c.ry ?? c.y) * T + T / 2;
+    if (c.papel11 && !saude(c).caido) {
+      const p = mundoParaTela(wx, wy + 13); g.save(); g.translate(p.x, p.y); g.scale(k, k);
+      g.beginPath(); g.moveTo(0, -4.5); g.lineTo(4.5, 0); g.lineTo(0, 4.5); g.lineTo(-4.5, 0); g.closePath(); g.fillStyle = COR_PAPEL[c.papel11]; g.fill(); g.lineWidth = 1.4; g.strokeStyle = c.bandido ? '#c22' : '#111'; g.stroke();
+      g.font = 'bold 6px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#111'; g.fillText({ frente: 'E', arqueiro: 'A', flanco: 'F', reserva: 'R', interno: '+' }[c.papel11], 0, 0.5);
+      if ((c.vigor ?? 1) < 0.98) { g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(-7, 6, 14, 2.5); g.fillStyle = c.vigor > 0.5 ? '#f0d050' : '#f07040'; g.fillRect(-7, 6, 14 * c.vigor, 2.5); }
+      g.restore();
+    }
+    if (c.panico11 > agora()) { const p = mundoParaTela(wx, wy - 34), r = 8 * k * (1 + 0.12 * Math.sin(tempoReal * 10)); g.beginPath(); g.arc(p.x, p.y, r, 0, 7); g.fillStyle = '#d23030'; g.fill(); g.lineWidth = 1.5 * k; g.strokeStyle = '#fff'; g.stroke(); g.font = `bold ${Math.round(12 * k)}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#fff'; g.fillText('!', p.x, p.y + 0.5 * k); }
+  }
+}
+function v11Info(c) {
+  const vg = Math.round((c.vigor ?? 1) * 100), F = c.form11 && V11.forms[c.form11];
+  return ` · Vigor: <span style="color:${vg > 50 ? '#ec5' : '#f74'}">${vg}%</span>` + (c.papel11 ? ` · Papel: <span style="color:${COR_PAPEL[c.papel11]}">${NOME_PAPEL[c.papel11]}</span>${F ? ` (${F.modo}${F.teto ? ', teto' : ''})` : ''}` : '') + (c.acao11 && c.tarefa && c.tarefa.tipo === 'lutar' ? ` · ${NOME_ACAO11[c.acao11]}` : '') + (c.panico11 > agora() ? ' · <b style="color:#f55">PÂNICO</b>' : '');
+}
+/* ---------- barra de ordens do grupo ---------- */
+function v11Barra() {
+  let el = document.getElementById('v11bar');
+  if (!el) {
+    el = document.createElement('div'); el.id = 'v11bar';
+    el.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:max(86px,calc(env(safe-area-inset-bottom) + 86px));z-index:30;display:none;gap:4px;background:rgba(18,20,24,.88);padding:5px;border-radius:8px;border:1px solid #445;font:12px sans-serif;flex-wrap:wrap;justify-content:center;max-width:96vw';
+    for (const [k, n] of [['auto', 'Auto'], ['linha', 'Formar linha'], ['quadrado', 'Formar quadrado'], ['teto', 'Teto de escudos'], ['resgatar', 'Resgatar feridos']]) {
+      const b = document.createElement('span'); b.className = 'ordem'; b.dataset.o11 = k; b.textContent = n; b.style.cssText = 'margin:0;padding:6px 10px;cursor:pointer;touch-action:manipulation';
+      b.onclick = (ev) => { ev.stopPropagation(); v11Ordem(k); }; el.appendChild(b);
+    }
+    document.body.appendChild(el);
+  }
+  if (innerWidth < 720) { el.style.bottom = 'auto'; el.style.top = 'calc(env(safe-area-inset-top) + 168px)'; el.style.flexWrap = 'nowrap'; el.style.overflowX = 'auto'; el.style.fontSize = '11px'; } else { el.style.top = 'auto'; el.style.bottom = 'max(86px,calc(env(safe-area-inset-bottom) + 86px))'; el.style.flexWrap = 'wrap'; }
+  const vis = !!V11.forms.c || colonos.some(c => c.tarefa && c.tarefa.tipo === 'lutar');
+  el.style.display = vis ? 'flex' : 'none';
+  if (vis) for (const b of el.children) { const k = b.dataset.o11; b.classList.toggle('sel', k === 'auto' ? !V11.ordem.modo && V11.ordem.teto == null : k === 'teto' ? !!V11.ordem.teto : V11.ordem.modo === k); }
+}
+function v11Ordem(k) {
+  const o = V11.ordem;
+  if (k === 'auto') { o.modo = null; o.teto = null; }
+  else if (k === 'linha') { o.modo = 'linha'; o.teto = false; }
+  else if (k === 'quadrado') o.modo = 'quadrado';
+  else if (k === 'teto') { o.teto = !o.teto; if (o.teto) o.modo = 'quadrado'; }
+  else if (k === 'resgatar') { o.resgatar = true; if (!o.modo) o.modo = 'quadrado'; }
+  const F = V11.forms.c; if (F) F.decT = 0;
+  st11('ordem_' + k); log(`Ordem ao grupo: ${{ auto: 'decisão automática', linha: 'formar linha', quadrado: 'formar quadrado', teto: o.teto ? 'teto de escudos' : 'baixar o teto', resgatar: 'resgatar feridos' }[k]}.`);
+}
+/* ---------- ganchos (envolvem funções da v8–v10) ---------- */
+{
+  const _lutar = lutar; lutar = function (c, a, extra) { if (c.panico11 > agora()) { if (!c.bandido) iniciarFuga(c, a); return; } return _lutar(c, a, extra); };
+  const _morrer = morrer; morrer = function (c, causa) {
+    if (c.bandido) {
+      const s = saude(c); if (s.morto) return; s.morto = true; s.causa = causa; s.caido = true;
+      if (c.arma) largarItem(Math.round(c.x), Math.round(c.y), c.arma === 'arco' ? (c.arcoLongo ? 'ARCO_LONGO' : 'ARCO') : 'ESPADA', 1);
+      if (c.escudo) largarItem(Math.round(c.x), Math.round(c.y), c.escudoPesado ? 'ESCUDO_PESADO' : 'ESCUDO', 1);
+      removerVisitante(c); log(`☠ ${c.nome} morreu (${causa}).`, 'bom'); st11('bandidosMortos'); v11Choque(c, 12, 0.4, 'um comparsa morreu'); return;
+    }
+    const era = !c.animal && colonos.includes(c), bando = c.animal && c.bando;
+    _morrer(c, causa);
+    if (era) v11Choque(c, 12, 0.35, 'um aliado morreu');
+    if (bando) for (const o of animais) if (o !== c && !o.morto && o.bando === bando && o.estado !== 'partir' && rnd() < 0.6) { o.estado = 'partir'; o.caminho = []; st11('matilhaRecua'); }
+  };
+  const _cair = cair; cair = function (c) { _cair(c); if (!c.animal) v11Choque(c, 10, 0.12, 'um aliado caiu'); };
+  const _fer = ferirAnimal; ferirAnimal = function (a, dano, autor, tipo) { if (!a.animal) return v11FerirHumano(a, dano, autor, tipo || 'perfuracao'); return _fer(a, dano, autor, tipo); };
+  const _ext = extrasFerido; extrasFerido = function (c) { const ex = _ext(c); if (c.guarda11 && c.escudo) { const F = c.form11 && V11.forms[c.form11]; ex.bloqueio = Math.max(ex.bloqueio || 0, (F && F.teto ? 1 : 0.55) * c.guarda11); } return ex; };
+  const _ic = iconesNecessidade; iconesNecessidade = function (c) { const l = _ic(c); if (c.panico11 > agora()) l.unshift('panico'); return l.filter(x => x !== 'panico'); };
+  const _vis = atualizarVisitante; atualizarVisitante = function (v, dt) { if (v.bandido) return atualizarBandido(v, dt); return _vis(v, dt); };
+  const _desc = descreverTarefaV8; descreverTarefaV8 = function (c, t) { if (t.tipo === 'lutar' && c.acao11 && c.papel11) return `Combate — ${NOME_PAPEL[c.papel11]}: ${NOME_ACAO11[c.acao11]} (${t.presa.nome.toLowerCase()}).`; return _desc(c, t); };
+  const _te = tentarEquipar; tentarEquipar = function (c) {
+    if (_te(c)) return true;
+    const want = c.arma === 'arco' && !c.arcoLongo ? 'ARCO_LONGO' : c.escudo && !c.escudoPesado && c.arma !== 'arco' ? 'ESCUDO_PESADO' : null; if (!want) return false;
+    const cs = itens.filter(it => it.tipo === want && !it.reservado).map(it => ({ x: it.x, y: it.y, adj: false, item: it })); if (!cs.length) return false;
+    const r = melhorAlvo(c, cs, 2); if (!r || r.caminho.length > 60) return false;
+    r.alvo.item.reservado = c; c.tarefa = { tipo: 'pegar', fase: 'indo', item: r.alvo.item }; c.caminho = r.caminho; return true;
+  };
+  const _eq = equipar; equipar = function (c, it) {
+    const tp = it.tipo, X = Math.round(c.x), Y = Math.round(c.y);
+    if (tp === 'ESCUDO_PESADO') { if (c.arma === 'arco') { it.reservado = null; return; } if (c.escudo) largarItem(X, Y, c.escudoPesado ? 'ESCUDO_PESADO' : 'ESCUDO', 1); c.escudo = true; c.escudoPesado = true; removerItem(it); log(`${c.nome} equipou o escudo pesado.`); return; }
+    if (tp === 'ARCO_LONGO') { if (c.arma) largarItem(X, Y, c.arma === 'arco' && c.arcoLongo ? 'ARCO_LONGO' : c.arma.toUpperCase(), 1); if (c.escudo) { largarItem(X, Y, c.escudoPesado ? 'ESCUDO_PESADO' : 'ESCUDO', 1); c.escudo = false; c.escudoPesado = false; } c.arma = 'arco'; c.arcoLongo = true; removerItem(it); log(`${c.nome} equipou o arco longo.`); return; }
+    if ((tp === 'ESPADA' || tp === 'ARCO') && c.arcoLongo) { largarItem(X, Y, 'ARCO_LONGO', 1); c.arma = null; c.arcoLongo = false; }
+    if (tp === 'ESPADA' || tp === 'ARCO') { const pes = c.escudoPesado; const r = _eq(c, it); if (!c.escudo && pes) { c.escudoPesado = false; /* o original largou 'ESCUDO': troca pelo pesado */ const q = itens.find(i => i.tipo === 'ESCUDO' && i.x === X && i.y === Y); if (q) q.tipo = 'ESCUDO_PESADO'; } return r; }
+    return _eq(c, it);
+  };
+  const _te2 = textoEquip; textoEquip = function (c) { let s = _te2(c); if (c.escudoPesado) s = s.replace('Escudo', 'Escudo pesado'); if (c.arcoLongo) s = s.replace('Arco', 'Arco longo'); return s; };
+  const _di = desenharItemV8; desenharItemV8 = function (g, it, cx, cy) {
+    if (it.tipo === 'ESCUDO_PESADO') { elipse(g, cx + 1, cy + 7, 11, 3); g.fillStyle = 'rgba(0,0,0,0.25)'; g.fill(); desenharEscudo(g, cx, cy, 9.5); g.beginPath(); g.arc(cx, cy, 3, 0, 7); g.fillStyle = '#8a8a8a'; g.fill(); return true; }
+    if (it.tipo === 'ARCO_LONGO') { elipse(g, cx + 1, cy + 6, 12, 3); g.fillStyle = 'rgba(0,0,0,0.25)'; g.fill(); g.save(); g.translate(cx, cy); g.scale(1.35, 1.35); desenharArma(g, { tipo: 'arco', x0: 2, y0: 0, x1: -2, y1: 0, d: { x: 1, y: 0 }, l: { x: 0, y: 1 }, carregado: false }); g.restore(); return true; }
+    return _di(g, it, cx, cy);
+  };
+  const _dicone = desenharIcone; desenharIcone = function (g, tipo, x, y, k) { if (tipo === 'panico') return; return _dicone(g, tipo, x, y, k); };
+}
+// modo dev (só aparece com a senha): bandidos de teste
+for (const [tam, n] of [['pequeno', 'pequeno (escudo, arqueiro, espada)'], ['medio', 'médio (2 escudos, 2 arqueiros, 1 espada)'], ['grande', 'grande (4 escudos, 3 arqueiros, 2 espadas)']])
+  addDev({ id: 'band_' + tam, cat: 'Combate v11', nome: `Bando de bandidos ${n} — clique`, mapa: (p) => spawnBandidos(tam, p.x, p.y).length });
+addDev({ id: 'v11_panico', cat: 'Combate v11', nome: 'Forçar pânico no colono (clique)', mapa: (p) => colonoAlvo(p.x, p.y, c => { V11.forcarPanico = true; v11Panico(c, 1, 'dev'); V11.forcarPanico = false; }, 'pânico') ? 1 : 0 });
+addDev({ id: 'v11_pesado', cat: 'Combate v11', nome: 'Equipar escudo pesado + espada (clique)', mapa: (p) => colonoAlvo(p.x, p.y, c => { c.arma = 'espada'; c.arcoLongo = false; c.escudo = true; c.escudoPesado = true; }, 'escudo pesado') ? 1 : 0 });
+addDev({ id: 'v11_longo', cat: 'Combate v11', nome: 'Equipar arco longo + 20 flechas (clique)', mapa: (p) => colonoAlvo(p.x, p.y, c => { c.arma = 'arco'; c.arcoLongo = true; c.escudo = false; c.escudoPesado = false; c.flechas = 20; }, 'arco longo') ? 1 : 0 });
+
 (async function iniciar() {
   redimensionar();
   spritesEfeitos();

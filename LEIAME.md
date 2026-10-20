@@ -338,3 +338,23 @@ Save versão **8** (códigos `C8:`/`J8:`). Lê saves e códigos das versões 6 e
 - Resgate fluido (ajoelhar → braços por baixo → erguer → levar → deitar), estilos de carregar melhorados e balão de tratamento sobre a parte ferida.
 - Animais em vista lateral, com passo/trote/galope, pastar, mancar, caído e morte.
 - Save v10 (código C10/J10). Lê os saves das versões 6 a 9.
+
+## v11 — Combate tático (formação, papéis, moral, quadrado e bandidos)
+
+Nada de desenhar zonas ou linhas: a formação nasce sozinha quando 2+ colonos entram em combate.
+
+- **Papéis automáticos** (losango sob o colono): **E** linha de frente (escudo ou lança), **A** arqueiro (fica 2–3 tiles atrás, de preferência atrás de árvore/rocha/parede, e atira por cima da linha), **F** flanco (corpo a corpo sem escudo, nas pontas), **R** reserva, **+** protegido dentro do quadrado.
+- **Formação em linha**: escudos se alinham de frente para o inimigo, e o grupo só avança quando a linha está formada. Na tela aparecem a linha pontilhada, a "posição fantasma" de cada um e uma seta quando o grupo avança.
+- **Quadrado (testudo)**: escudos nos 4 lados, com arqueiros e feridos no meio. O **teto de escudos** (placas de madeira que sobem por cima do quadrado) para cerca de 80% das flechas em quem está dentro e deixa o grupo mais lento. A IA forma o quadrado quando há 3+ escudos e arqueiros inimigos, chuva de flechas, inimigos de vários lados ou um ferido fora da formação. Ela ergue o teto quando as flechas apertam.
+- **Resgate**: um membro sai da formação, **arrasta** o ferido caído para o centro do quadrado (animação de arrastar da v8) e o deixa lá para os médicos tratarem.
+- **Ordens por grupo** (barra que só aparece em combate): Auto · Formar linha · Formar quadrado · Teto de escudos · Resgatar feridos.
+- **IA de utilidade**: a cada 0,35 s cada unidade pontua as opções segurar, atacar, atirar, recuar (ferido) e reagrupar (linha rompida), com pesos pelo papel. O painel do colono mostra papel, ação e vigor.
+- **Moral/pânico** (ícone vermelho "!"): a morte ou queda de um aliado próximo, ou a linha rompida, dá uma chance de pânico. A chance é maior com humor baixo e dor alta, e menor com escudo pesado ou dentro do quadrado. Quem entra em pânico foge e ganha o pensamento −6.
+- **Cobertura**: árvore (0,3) ou rocha/parede (0,45) entre você e o atacante faz golpes e flechas errarem mais. O arqueiro coberto mira melhor.
+- **Prioridade de alvo**: os dois lados preferem quem está ferido, isolado ou com arma perigosa (o arco primeiro). Os lobos também trocam de alvo.
+- **Vigor**: lutar cansa (até −35% de mira e −40% de velocidade) e o vigor volta descansando. Aparece como barrinha amarela sob o losango.
+- **Equipamento novo na bancada**: *Escudo pesado* (bloqueia mais, segura melhor a linha e resiste ao pânico, mas é 18% mais lento) e *Arco longo* (alcance de 10 em vez de 7,5, e perde menos precisão com a distância).
+- **Equilíbrio**: as infecções ficaram menos frequentes (0,6 → 0,42) e a imunidade um pouco mais rápida. Os lobos fogem com 50% de vida e a matilha recua quando um lobo morre. Um aliado ao lado amortece parte dos golpes. Todo dano continua indo pela saúde por partes da v10.
+- **Modo dev** (mesma senha): *Combate v11* → bandos de bandidos pequeno, médio ou grande (escudo, arqueiro, espada), forçar pânico, equipar escudo pesado ou arco longo. Os bandidos usam a mesma formação e a mesma IA, fogem em pânico e largam as armas ao morrer.
+- Corrigido: inspecionar um colono armado dava `ARMAS is not defined`.
+- Saves da v10 continuam carregando (os campos novos têm valor padrão).
