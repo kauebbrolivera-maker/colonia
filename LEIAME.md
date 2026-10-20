@@ -305,3 +305,22 @@ Save versão **8** (códigos `C8:`/`J8:`). Lê saves e códigos das versões 6 e
 - Algumas animações compartilham código: as 4 bandagens usam a mesma rotina de "voltas" (`orbitaBandagem`) com alvo/raio diferentes, as 2 talas usam `talas`, e desmaiar/levantar/deitado são poses do paciente (`poseDeitada`), não do médico.
 - Cozinhar carne não existe (é comida crua como as frutas). Não há armadura nem munição recuperável além das flechas que ficam no chão por um tempo.
 - O tempo de luta é em segundos de simulação, então nas velocidades 2×/3× um combate dura "horas" no relógio do jogo.
+
+## v9 — Modo Dev (ferramentas de desenvolvedor)
+
+- **Entrada:** só por **Opções → Desenvolvedor → 🛠 Modo Dev** (no celular/iPhone: botão ⚙/Opções da barra de toque). Sem atalho de teclado.
+- **Senha fixa:** o jogo não guarda a senha, só o hash SHA-256 dela. O que você digita passa pelo SHA-256 (UTF-8) e é comparado com esse hash. Usa `crypto.subtle` quando o navegador tem e um SHA-256 em JS puro quando não tem (`file://` ou página não segura). Senha errada: a caixa treme e aparece "Senha errada.". Não dá para criar nem trocar a senha.
+- Depois de desbloqueado, o modo continua ligado nesta e nas próximas sessões (flag `colonia.devAtivo` no localStorage) até você usar **⏻ Sair do modo dev**. O selo **MODO DEV** fica no canto inferior esquerdo; tocar nele abre o painel.
+- **Painel** (escuro, no estilo debug actions do RimWorld): busca, categorias, funciona no toque, botões de minimizar e fechar. Ações com 📍 pedem um clique ou toque no mapa, e arrastar coloca várias de uma vez. Esc ou botão direito cancela.
+  - Animais: veado, lobo, urso, matilha de lobos (3), manada de veados (3).
+  - Árvores: carvalho, pinheiro, álamo, bétula, bordo × 3 variantes + aleatória. Plantas: arbusto com ou sem frutas, amadurecer plantações, rebrotar frutas. Terreno: rocha minerável.
+  - Itens (com quantidade): madeira, pedra, fruta, milho, carne, pele, flechas, bandagem, machado, picareta, espada, arco, escudo.
+  - Colonos: colono extra (visual e prioridades aleatórios, nome opcional; entra no save), curar um ou todos, encher ou zerar necessidades, equipar espada+escudo ou arco+flechas.
+  - Ferimentos num colono clicado (tipo, parte do corpo e gravidade): contusão, corte, sangramento leve/médio/forte, fratura, infecção, desmaio.
+  - Construções instantâneas: parede de madeira ou pedra (linha ou sala), porta, cama, bancada, concluir todas as plantas.
+  - Eventos: chuva liga/desliga, visitante, ataque de lobos agora, matilha na borda, urso, ataque de urso agora, manada de veados.
+  - Tempo: +1 h, +6 h, +1 dia (simula de verdade, passo a passo), ir para uma hora.
+  - Ferramentas: apagar coisa (animal, visitante, item, colono (nunca o último), construção sem devolver material, árvore, toco, rocha, plantação, zona), ver o mapa inteiro.
+  - Modo deus (liga/desliga): construção instantânea, fabricação instantânea, sem fome, sem sono, revelar (rótulos de todos os animais do mapa; o jogo não tem névoa de guerra).
+- Toda ação dev aparece no registro como "🛠 DEV: …".
+- Saves: a versão continua C8 e saves da v8 carregam normalmente.

@@ -568,6 +568,7 @@ function removerItem(it) {
 const itemExiste = it => it && itemEm.get(idx(it.x, it.y)) === it;
 // larga uma pilha no chão, juntando com pilhas iguais e espalhando se precisar
 function largarItem(x0, y0, tipo, qtd) {
+  if (typeof semDrop !== 'undefined' && semDrop) return null; // apagar (modo dev) não devolve materiais
   for (let r = 0; r <= 6 && qtd > 0; r++) {
     for (let dy = -r; dy <= r && qtd > 0; dy++) for (let dx = -r; dx <= r && qtd > 0; dx++) {
       if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
@@ -2843,7 +2844,7 @@ function render(dtR = 0) {
   }
   for (const c of todos) {
     const wx = c.rx * T + T / 2, wy = c.ry * T + T / 2;
-    if (camera.zoom > 0.6 && !c.carregadoPor && (!c.animal || c === (inspecao && inspecao.animal) || c.cacar || c.estado === 'atacar')) { const p = mundoParaTela(wx, wy + 15); rotulo(ctx, c.nome + (c.visitante ? ' (visitante)' : c.triste ? ' (triste)' : (c.saude && c.saude.caido ? ' (caído)' : '')), p.x, p.y, c.visitante ? '#e8d48a' : c.triste ? '#9db8ff' : (c === selecionado ? '#fff' : '#ddd')); }
+    if (camera.zoom > 0.6 && !c.carregadoPor && (!c.animal || devCfg.revelar || c === (inspecao && inspecao.animal) || c.cacar || c.estado === 'atacar')) { const p = mundoParaTela(wx, wy + 15); rotulo(ctx, c.nome + (c.visitante ? ' (visitante)' : c.triste ? ' (triste)' : (c.saude && c.saude.caido ? ' (caído)' : '')), p.x, p.y, c.visitante ? '#e8d48a' : c.triste ? '#9db8ff' : (c === selecionado ? '#fff' : '#ddd')); }
     const t = c.tarefa;
     if (t && t.fase === 'fazendo' && t.total) {
       const alvo = t.alvo || c, p = mundoParaTela((t.alvo ? alvo.x * T + T / 2 : wx), (t.alvo ? alvo.y * T : wy - 22));
@@ -3085,6 +3086,7 @@ function limitarCamera() {
   camera.y = clamp(camera.y, 0, mapa.A * T);
 }
 function definirModo(m) {
+  if (modo === 'dev' && m !== 'dev' && $('devPainel')) $('devPainel').classList.remove('mini'); // saiu do clique no mapa: painel volta
   modo = m; mouse.arrastoIni = null;
   const el = $('modo');
   el.style.display = m ? 'block' : 'none';
@@ -3098,6 +3100,7 @@ function definirModo(m) {
 function aplicarOrdens(a, b) {
   if (PLANTAS[modo]) { colocarPlantas(a, b, modo); return; }
   if (modo === 'cacar' || modo === 'cacada') return ordemCaca(a, b);
+  if (modo === 'dev') return devAplicar(a, b);
   const x0 = clamp(Math.min(a.x, b.x), 0, mapa.L - 1), x1 = clamp(Math.max(a.x, b.x), 0, mapa.L - 1);
   const y0 = clamp(Math.min(a.y, b.y), 0, mapa.A - 1), y1 = clamp(Math.max(a.y, b.y), 0, mapa.A - 1);
   let n = 0;
@@ -3118,6 +3121,7 @@ function aplicarOrdens(a, b) {
   if (n) log(modo === 'cortar' ? `${n} árvore(s) marcada(s) para corte.` : modo === 'minerar' ? `${n} rocha(s) marcada(s) para mineração.` : `${n} ordem(ns) cancelada(s) / marcada(s) para desconstruir.`);
 }
 window.addEventListener('keydown', e => {
+  if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return; // digitando num campo
   if (e.code === 'Tab') { e.preventDefault(); const i = colonos.indexOf(selecionado); selecionar(colonos[(i + 1) % colonos.length], true); return; }
   if (e.code === 'Space') { e.preventDefault(); alternarPausa(); return; }
   if (e.code === 'Escape') { if (modo) definirModo(null); else { selecionar(null); inspecao = null; abrirAba(null); } return; }
@@ -3467,6 +3471,7 @@ function abrirAba(nome) {
       '<div class="breve">A escolha fica salva neste navegador.</div>' +
       `<h4 style="margin-top:12px">Arte</h4><span class="ordem${ARTE === 'svg' ? ' sel' : ''}" data-arte="svg">Vetorial (atlas SVG)</span><span class="ordem${ARTE !== 'svg' ? ' sel' : ''}" data-arte="procedural">Procedural (v6)</span>
       <div class="breve" style="font-style:normal">Vetorial: árvores, itens, plantação, cama, bancada, paredes e ícones desenhados em SVG (Inkscape). Procedural: tudo desenhado por código.</div>` +
+      `<h4 style="margin-top:12px">Desenvolvedor</h4><span class="ordem" data-dev="abrir" style="opacity:.75;font-size:12px">🛠 Modo Dev${devAtivo ? ' (ativo)' : ''}</span>` +
       `<h4 style="margin-top:12px">Jogo — salvar e carregar</h4>
       <span class="ordem" data-sv="salvar">💾 Salvar (K)</span><span class="ordem" data-sv="carregar">📂 Carregar (L)</span><span class="ordem" data-sv="auto">↺ Carregar automático</span><span class="ordem" data-sv="novo">✦ Novo mapa</span>
       <div class="breve" style="font-style:normal">Manual: ${infoSlot('colonia.salvo')} · Automático: ${infoSlot('colonia.auto')} (a cada 2 min e ao sair)</div>
@@ -3481,6 +3486,7 @@ function abrirAba(nome) {
   p.querySelectorAll('.ordem[data-modo]').forEach(b => b.onclick = () => { definirModo(b.dataset.modo); abrirAba(null); });
   p.querySelectorAll('.ordem[data-q]').forEach(b => b.onclick = () => definirQualidade(b.dataset.q));
   p.querySelectorAll('.ordem[data-arte]').forEach(b => b.onclick = () => { ARTE = b.dataset.arte; try { localStorage.setItem('colonia.arte', ARTE); } catch (e) { /* sem storage */ } definirQualidade(QUALIDADE, false); mostrarToast(`Arte: ${ARTE === 'svg' ? 'vetorial' : 'procedural'}`); });
+  p.querySelectorAll('[data-dev]').forEach(b => b.onclick = () => abrirModoDev());
   p.querySelectorAll('.ordem[data-sv]').forEach(b => b.onclick = () => {
     const k = b.dataset.sv;
     if (k === 'salvar') salvarJogo('manual'); else if (k === 'carregar') carregarJogo('manual'); else if (k === 'auto') carregarJogo('auto');
@@ -3566,7 +3572,7 @@ function aplicarSave(d) {
   itemEm.clear(); itens.length = 0;
   for (const it of d.itens) { if (it.solto) largarItem(it.x, it.y, it.tipo, it.qtd); else if (!itemEm.has(idx(it.x, it.y))) novoItem(it.x, it.y, it.tipo, it.qtd); else largarItem(it.x, it.y, it.tipo, it.qtd); }
   for (const sc of d.colonos) {
-    const c = colonos.find(o => o.nome === sc.nome); if (!c) continue;
+    let c = colonos.find(o => o.nome === sc.nome); if (!c) c = criarColonoExtra({ nome: sc.nome }, sc.x, sc.y, true); // colono extra (modo dev)
     const { camaPropria, ...resto } = sc; Object.assign(c, resto);
     c.prioridades = { ...Object.fromEntries(CATEGORIAS.map(([k]) => [k, 3])), ...sc.prioridades };
     c.tarefa = null; c.caminho = []; c.carregando = null; c.balao = null; c.dormindo = false; c.camaPropria = null;
@@ -5054,6 +5060,288 @@ function ordemCaca(a, b) {
 instalarUIv8();
 window.V8 = { ferir, criarAnimal, grupoAnimais, ataqueForcado, dispararEventoV8, iniciarCacada, encerrarCacada, animais, cacadas, projeteis, saude, seres, povoarAnimais, estiloResgate, POSES };
 
+/* =========================== MODO DEV (v9) ===========================
+   Entrada só por Opções → "Modo Dev". A senha é fixa: o código guarda apenas o hash
+   SHA-256 dela e compara com o hash do que foi digitado (UTF-8). */
+let DEV_HASH_FIXO = '9dc57cd18e411cfb87baa5f855a878f62018ed1589f9857af4081c4452ca9689';
+const DEV_FLAG = 'colonia.devAtivo';
+let devAtivo = false, devAcao = null;
+const devCfg = { obraInstantanea: false, fabricaInstantanea: false, semFome: false, semSono: false, revelar: false };
+function sha256js(bytes) { // fallback em JS puro (file:// sem crypto.subtle)
+  const K = [0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+  const H = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+  const l = bytes.length, n = ((l + 9 + 63) >> 6) << 6, m = new Uint8Array(n); m.set(bytes); m[l] = 0x80;
+  const dv = new DataView(m.buffer); dv.setUint32(n - 4, l * 8); dv.setUint32(n - 8, Math.floor(l / 0x20000000));
+  const w = new Uint32Array(64), r = (x, k) => (x >>> k) | (x << (32 - k));
+  for (let o = 0; o < n; o += 64) {
+    for (let t = 0; t < 16; t++) w[t] = dv.getUint32(o + t * 4);
+    for (let t = 16; t < 64; t++) { const s0 = r(w[t-15], 7) ^ r(w[t-15], 18) ^ (w[t-15] >>> 3), s1 = r(w[t-2], 17) ^ r(w[t-2], 19) ^ (w[t-2] >>> 10); w[t] = (w[t-16] + s0 + w[t-7] + s1) | 0; }
+    let [a, b, c, d, e, f, g, h] = H;
+    for (let t = 0; t < 64; t++) {
+      const t1 = (h + (r(e, 6) ^ r(e, 11) ^ r(e, 25)) + ((e & f) ^ (~e & g)) + K[t] + w[t]) | 0, t2 = ((r(a, 2) ^ r(a, 13) ^ r(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) | 0;
+      h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+    }
+    H[0] = (H[0] + a) | 0; H[1] = (H[1] + b) | 0; H[2] = (H[2] + c) | 0; H[3] = (H[3] + d) | 0; H[4] = (H[4] + e) | 0; H[5] = (H[5] + f) | 0; H[6] = (H[6] + g) | 0; H[7] = (H[7] + h) | 0;
+  }
+  return H.map(x => (x >>> 0).toString(16).padStart(8, '0')).join('');
+}
+async function hashSenha(s) {
+  const bytes = new TextEncoder().encode(s);
+  try { if (window.crypto && crypto.subtle) { const b = await crypto.subtle.digest('SHA-256', bytes); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); } } catch (e) {}
+  return sha256js(bytes);
+}
+const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+const lsSet = (k, v) => { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} };
+
+/* ---------- caixa de senha ---------- */
+function dlgSenha() {
+  const el = $('devDlg');
+  el.innerHTML = `<div class="caixa painel"><h4>Senha do Modo Dev</h4><input type="password" data-campo="senha" placeholder="Senha" autocomplete="off">
+    <div class="msgDev"></div><span class="ordem" data-dlg="ok">Confirmar</span><span class="ordem" data-dlg="x">Cancelar</span></div>`;
+  el.style.display = 'flex';
+  setTimeout(() => { const i = el.querySelector('input'); if (i) i.focus(); }, 30);
+}
+function erroDlg(msg) {
+  const cx = $('devDlg').querySelector('.caixa'); $('devDlg').querySelector('.msgDev').textContent = msg;
+  cx.classList.remove('treme'); void cx.offsetWidth; cx.classList.add('treme');
+  const i = cx.querySelector('input'); if (i) { i.value = ''; i.focus(); }
+}
+async function confirmarDlg() {
+  const el = $('devDlg'), i = el.querySelector('[data-campo=senha]'), v = i ? i.value : '';
+  if (await hashSenha(v) !== DEV_HASH_FIXO) { log('🛠 Senha do modo dev recusada.'); return erroDlg('Senha errada.'); }
+  el.style.display = 'none'; ativarDev();
+}
+function abrirModoDev() {
+  abrirAba(null);
+  if (devAtivo) return abrirPainelDev();
+  dlgSenha();
+}
+function ativarDev() { devAtivo = true; lsSet(DEV_FLAG, '1'); $('devBadge').style.display = 'block'; devLog('modo dev ativado'); abrirPainelDev(); }
+function sairDev() {
+  devAtivo = false; lsSet(DEV_FLAG, null); for (const k in devCfg) devCfg[k] = false;
+  $('devPainel').style.display = 'none'; $('devBadge').style.display = 'none'; if (modo === 'dev') definirModo(null); devAcao = null;
+  log('🛠 Modo dev desativado.'); 
+}
+const devLog = t => log('🛠 DEV: ' + t, 'dev');
+
+/* ---------- ações ---------- */
+const PARTES_OPC = () => Object.keys(PARTES).map(k => [k, PARTES[k].nome]);
+const ITENS_DEV = ['MADEIRA', 'PEDRA', 'FRUTAS', 'MILHO', 'CARNE', 'PELE', 'FLECHAS', 'BANDAGEM', 'MACHADO', 'PICARETA', 'ESPADA', 'ARCO', 'ESCUDO'];
+const ARV_DEV = [[1, 'Carvalho'], [2, 'Pinheiro'], [3, 'Álamo'], [5, 'Bétula'], [6, 'Bordo']];
+function colonoNoTile(x, y) { let m = null, md = 1.3; for (const c of colonos) { const d = Math.hypot(c.x - x, c.y - y); if (d < md) { md = d; m = c; } } return m; }
+const livreBloquear = (x, y) => { if (!dentro(x, y)) return false; const i = idx(x, y), t = mapa.terreno[i];
+  return [TERRENO.GRAMA, TERRENO.TERRA, TERRENO.TERRA_RICA, TERRENO.AREIA].includes(t) && !mapa.arvore[i] && !mapa.estrutura[i] && !mapa.obra.has(i) && !mapa.cultivo.has(i)
+    && !colonos.some(c => Math.round(c.x) === x && Math.round(c.y) === y) && !animais.some(a => Math.round(a.x) === x && Math.round(a.y) === y); };
+function porTile(a, b, f, max = 400, passo = 1) { let n = 0; const x0 = Math.min(a.x, b.x), x1 = Math.max(a.x, b.x), y0 = Math.min(a.y, b.y), y1 = Math.max(a.y, b.y);
+  for (let y = y0; y <= y1; y += passo) for (let x = x0; x <= x1; x += passo) { if (n >= max) return n; if (dentro(x, y) && f(x, y)) n++; } return n; }
+function plantarArvore(x, y, a, v) { if (!livreBloquear(x, y)) return false; const i = idx(x, y);
+  mapa.arvore[i] = a; mapa.variante[i] = v === 'r' ? Math.floor(rnd() * 3) : v; mapa.fase[i] = rnd() * Math.PI * 2; mapa.toco[i] = 0;
+  if (a === ARBUSTO) { if (!mapa.arbustos.includes(i)) mapa.arbustos.push(i); mapa.frutos[i] = v === 'vazio' ? 0 : 1; if (v === 'vazio') { mapa.variante[i] = Math.floor(rnd() * 3); mapa.rebrota[i] = agora() + CONFIG.FRUTAS_REBROTAM_DIAS * 1440; } }
+  aposBloquear(x, y); repintar(x - 2, y - 2, x + 2, y + 2); return true; }
+function porRocha(x, y) { if (!livreBloquear(x, y)) return false; mapa.terreno[idx(x, y)] = TERRENO.ROCHA; aposBloquear(x, y); repintar(x - 2, y - 2, x + 2, y + 2); return true; }
+function construirJa(a, b, tipo) { let n = 0; for (const t of tilesPlanta(a, b, tipo)) { if (!livreBloquear(t.x, t.y)) continue; concluirObra({ tipo: t.tipo || tipo, x: t.x, y: t.y, entregue: 0, progresso: 0 }); n++; } return n; }
+let semDrop = false;
+function apagarEm(x, y) {
+  if (!dentro(x, y)) return false;
+  const i = idx(x, y);
+  const an = animais.find(a => Math.hypot(a.x - x, a.y - y) < 0.8); if (an) { removerAnimal(an); return 'animal'; }
+  const vi = visitantes.find(v => Math.hypot(v.x - x, v.y - y) < 0.8); if (vi) { visitantes.splice(visitantes.indexOf(vi), 1); return 'visitante'; }
+  const it = itemEm.get(i); if (it) { removerItem(it); return 'item'; }
+  const c = colonos.find(o => Math.hypot(o.x - x, o.y - y) < 0.8);
+  if (c) { if (colonos.length <= 1) { mostrarToast('Não dá para apagar o último colono'); return false; } removerColono(c); return 'colono'; }
+  if (mapa.estrutura[i]) { semDrop = true; try { desconstruir(x, y); } finally { semDrop = false; } return 'construção'; }
+  if (mapa.obra.has(i)) { mapa.obra.delete(i); return 'planta'; }
+  if (mapa.arvore[i]) { const ar = mapa.arvore[i]; mapa.arvore[i] = 0; mapa.toco[i] = 0; mapa.frutos[i] = 0; mapa.desig.delete(i); if (ar === ARBUSTO) { const k = mapa.arbustos.indexOf(i); if (k >= 0) mapa.arbustos.splice(k, 1); } calcularRegioes(); repintar(x - 2, y - 2, x + 2, y + 2); return 'árvore'; }
+  if (mapa.toco[i]) { mapa.toco[i] = 0; repintar(x - 1, y - 1, x + 1, y + 1); return 'toco'; }
+  if (mapa.terreno[i] === TERRENO.ROCHA) { mapa.terreno[i] = TERRENO.TERRA; mapa.desig.delete(i); calcularRegioes(); repintar(x - 2, y - 2, x + 2, y + 2); return 'rocha'; }
+  if (mapa.cultivo.has(i)) { mapa.cultivo.delete(i); return 'plantação'; }
+  if (mapa.zona.has(i)) { mapa.zona.delete(i); mapa.zonaTiles = mapa.zonaTiles.filter(t => !(t.x === x && t.y === y)); return 'zona'; }
+  return false;
+}
+function removerColono(c) {
+  cancelar(c);
+  for (const o of colonos) if (o !== c && o.tarefa && (o.tarefa.paciente === c || o.tarefa.por === c || o.tarefa.medico === c)) cancelar(o);
+  for (const h of cacadas.slice()) if (h.cacadores.includes(c)) encerrarCacada(h, false, 'caçador removido');
+  for (let k = conversas.length - 1; k >= 0; k--) if (conversas[k].a === c || conversas[k].b === c) conversas.splice(k, 1);
+  if (c.camaPropria) c.camaPropria.dono = null;
+  for (const b of mapa.camas) if (b.paciente === c) b.paciente = null;
+  for (const it of itens) if (it.reservado === c) it.reservado = null;
+  colonos.splice(colonos.indexOf(c), 1); if (selecionado === c) selecionar(null);
+  for (const o of colonos) delete o.opiniao[c.nome];
+  montarRetratos();
+}
+const CORES_PELE = ['#f0c8a0', '#e3b48a', '#c98e62', '#a8714a', '#8d5a3b', '#6b4329'], CORES_CABELO = ['#8a3b1c', '#231a14', '#141010', '#5a3a1c', '#9a7a4a', '#d8b46a', '#7a7a7a'];
+function criarColonoExtra(def, x, y, doSave) {
+  const R = doSave ? Math.random : rnd, so = l => l[Math.floor(R() * l.length)];
+  const usados = new Set(colonos.map(c => c.nome));
+  let nome = (def.nome || '').trim().slice(0, 16) || so(NOMES_VISITANTES.filter(n => !usados.has(n)).concat(['Rui', 'Clara', 'Ivo', 'Sofia']));
+  while (usados.has(nome) && !doSave) nome += '·';
+  const pri = Object.fromEntries(CATEGORIAS.map(([k]) => [k, 1 + Math.floor(R() * 3)]));
+  const c = { nome, pele: so(CORES_PELE), cabelo: so(CORES_CABELO), roupa: so(ROUPAS_VIS.concat(['#a8463a', '#46698f', '#5f7f45'])), estilo: so(['curto', 'longo', 'coque']), barba: R() < 0.3, leve: R() < 0.3, comFerramentas: [], pri,
+    x, y, dir: DIR.BAIXO, andando: false, caminho: [], vel: 0, dist: 0, yawAlvo: 0, yawVis: 0, mola: { y: 0, v: 0 }, piscaT: 2,
+    ax: x, ay: y, adist: 0, avel: 0, tarefa: null, pensarT: 0.5, checarT: 1, carregando: null, dormindo: false,
+    fome: 80, sono: 85, humor: 60, triste: false, memorias: [], opiniao: {}, cdConversa: 30, balao: null, avisouFome: false, imgSheet: null, ultimoTrabalho: null,
+    prioridades: { ...pri }, ferramentas: { machado: false, picareta: false }, camaPropria: null, naCama: false, acaoF: 0, aAcaoF: 0,
+    saude: novaSaude(), arma: null, escudo: false, flechas: 0, bandagens: 0, extra: true };
+  c.cama = livrePerto(Math.round(x), Math.round(y)) || { x: Math.round(x), y: Math.round(y) };
+  for (const o of colonos) { c.opiniao[o.nome] = 0; o.opiniao[c.nome] = 0; }
+  colonos.push(c); montarRetratos();
+  return c;
+}
+function avancarTempo(min) { // simula de verdade (1 minuto de jogo por passo)
+  const v = estado.velocidade, p = estado.pausado; estado.velocidade = 3; estado.pausado = false;
+  const porPasso = (1 / 30) * 3 * CONFIG.MIN_JOGO_POR_SEG, n = Math.ceil(min / porPasso);
+  try { for (let k = 0; k < n; k++) { for (const c of seres()) guardarAnterior(c); passoSimulacao(1 / 30); } }
+  finally { estado.velocidade = v; estado.pausado = p; }
+}
+function colonoAlvo(x, y, f, rot) { const c = colonoNoTile(x, y); if (!c) { mostrarToast('Clique/toque num colono'); return false; } f(c); devLog(`${rot} — ${c.nome}`); return true; }
+const FER_DEV = [['contusao', 'Contusão'], ['corte', 'Corte'], ['sleve', 'Sangramento leve'], ['smedio', 'Sangramento médio'], ['sforte', 'Sangramento forte'], ['fratura', 'Fratura'], ['infeccao', 'Infecção'], ['desmaio', 'Desmaio']];
+function aplicarFerida(c, tipo, parte, sev) {
+  const s = saude(c);
+  if (tipo === 'desmaio') { s.sangue = Math.min(s.sangue, 35); recalcularSaude(c); if (!s.caido) cair(c); return; }
+  const base = tipo.startsWith('s') && tipo !== 'sleve' && tipo !== 'smedio' && tipo !== 'sforte' ? tipo : tipo;
+  if (base === 'sleve' || base === 'smedio' || base === 'sforte') { ferir(c, parte, 'corte', sev, 'dev'); const f = s.feridas[s.feridas.length - 1]; f.sangra = SANGRA[{ sleve: 'leve', smedio: 'medio', sforte: 'forte' }[base]]; }
+  else if (base === 'infeccao') { ferir(c, parte, 'corte', sev, 'dev'); const f = s.feridas[s.feridas.length - 1]; f.sangra = 0; f.infec = 0.3; f.idade = 400; estado.stats.infeccoes++; }
+  else ferir(c, parte, base, sev, 'dev');
+  recalcularSaude(c);
+}
+function curar(c) { const s = saude(c); c.saude = novaSaude(); if (s.caido) { c.anim = { tipo: 'levantar', t: 0, dur: 1.3 }; } if (c.carregadoPor) { const r = c.carregadoPor; c.carregadoPor = null; if (r.tarefa && r.tarefa.paciente === c) cancelar(r); } if (c.tarefa && ['repousar', 'paciente', 'apoiado', 'esperarAjuda'].includes(c.tarefa.tipo)) fim(c); c.pedeAjuda = false; c.sentado = false; }
+// cada ação: id, cat, nome, mapa (clique/arraste no mapa) ou rodar (imediata), campos (parâmetros)
+const ACOES_DEV = [];
+const addDev = (o) => ACOES_DEV.push(o);
+for (const [esp, nome] of [['veado', 'Veado'], ['lobo', 'Lobo'], ['urso', 'Urso']])
+  addDev({ id: 'an_' + esp, cat: 'Animais', nome, mapa: (a, b) => porTile(a, b, (x, y) => chaoFirme(x, y) && !!criarAnimal(esp, x, y, { bando: ++idBando, casa: { x, y }, ...(esp === 'lobo' ? { ate: agora() + 1440 } : {}) }), 12, 2), dica: 'arraste para vários (1 a cada 2 tiles)' });
+addDev({ id: 'an_matilha', cat: 'Animais', nome: 'Matilha de lobos (3)', mapa: (a) => { const b = ++idBando; let n = 0; for (let k = 0; k < 3; k++) { const q = livrePerto(a.x + k - 1, a.y) || a; if (chaoFirme(q.x, q.y)) { criarAnimal('lobo', q.x, q.y, { bando: b, caca: true, ate: agora() + 1440 }); n++; } } return n; } });
+addDev({ id: 'an_manada', cat: 'Animais', nome: 'Manada de veados (3)', mapa: (a) => { const b = ++idBando; let n = 0; for (let k = 0; k < 3; k++) { const q = livrePerto(a.x + k - 1, a.y) || a; if (chaoFirme(q.x, q.y)) { criarAnimal('veado', q.x, q.y, { bando: b }); n++; } } return n; } });
+for (const [a, nome] of ARV_DEV) for (const v of [0, 1, 2]) addDev({ id: `arv_${a}_${v}`, cat: 'Árvores', nome: `${nome} — variante ${v + 1}`, mapa: (p, q) => porTile(p, q, (x, y) => plantarArvore(x, y, a, v)) });
+for (const [a, nome] of ARV_DEV) addDev({ id: `arv_${a}_r`, cat: 'Árvores', nome: `${nome} — variante aleatória`, mapa: (p, q) => porTile(p, q, (x, y) => plantarArvore(x, y, a, 'r')) });
+addDev({ id: 'arb_cheio', cat: 'Plantas', nome: 'Arbusto de frutas (com frutas)', mapa: (p, q) => porTile(p, q, (x, y) => plantarArvore(x, y, ARBUSTO, 'r')) });
+addDev({ id: 'arb_vazio', cat: 'Plantas', nome: 'Arbusto de frutas (já colhido)', mapa: (p, q) => porTile(p, q, (x, y) => plantarArvore(x, y, ARBUSTO, 'vazio')) });
+addDev({ id: 'pl_amadurecer', cat: 'Plantas', nome: 'Amadurecer todas as plantações', rodar: () => { let n = 0; for (const p of mapa.cultivo.values()) if (p.fase > 0) { p.cresce = 1; n++; } return n + ' plantas'; } });
+addDev({ id: 'pl_rebrotar', cat: 'Plantas', nome: 'Rebrotar frutas de todos os arbustos', rodar: () => { let n = 0; for (const i of mapa.arbustos) if (mapa.arvore[i] === ARBUSTO && !mapa.frutos[i]) { mapa.frutos[i] = 1; n++; } return n + ' arbustos'; } });
+addDev({ id: 'rocha', cat: 'Terreno', nome: 'Rocha (minerável)', mapa: (p, q) => porTile(p, q, porRocha) });
+for (const t of ITENS_DEV) addDev({ id: 'it_' + t, cat: 'Itens', nome: ITEM[t].nome, campos: ['qtd'], mapa: (p, q, P) => porTile(p, q, (x, y) => { if (!chaoFirme(x, y) || mapa.estrutura[idx(x, y)]) return false; largarItem(x, y, t, Math.max(1, Math.min(999, P.qtd | 0))); return true; }, 60) });
+addDev({ id: 'col_extra', cat: 'Colonos', nome: 'Colono extra (visual aleatório)', campos: ['nome'], mapa: (p, q, P) => { if (!chaoFirme(p.x, p.y)) return 0; const c = criarColonoExtra({ nome: P.nome }, p.x, p.y); devLog('colono ' + c.nome + ' criado'); return 1; } });
+addDev({ id: 'col_curar', cat: 'Colonos', nome: 'Curar colono (clique)', mapa: (p) => colonoAlvo(p.x, p.y, curar, 'curado') ? 1 : 0 });
+addDev({ id: 'col_curarTodos', cat: 'Colonos', nome: 'Curar todos', rodar: () => { for (const c of colonos) curar(c); return colonos.length + ' colonos'; } });
+addDev({ id: 'col_encher', cat: 'Colonos', nome: 'Encher necessidades (clique)', mapa: (p) => colonoAlvo(p.x, p.y, c => { c.fome = 100; c.sono = 100; c.humor = 100; c.triste = false; }, 'necessidades cheias') ? 1 : 0 });
+addDev({ id: 'col_zerar', cat: 'Colonos', nome: 'Zerar necessidades (clique)', mapa: (p) => colonoAlvo(p.x, p.y, c => { c.fome = 0; c.sono = 0; }, 'necessidades zeradas') ? 1 : 0 });
+addDev({ id: 'col_encherTodos', cat: 'Colonos', nome: 'Encher necessidades de todos', rodar: () => { for (const c of colonos) { c.fome = 100; c.sono = 100; c.humor = 100; c.triste = false; } return 'ok'; } });
+addDev({ id: 'col_equipar', cat: 'Colonos', nome: 'Equipar (espada + escudo, bandagens) — clique', mapa: (p) => colonoAlvo(p.x, p.y, c => { c.arma = 'espada'; c.escudo = true; c.bandagens = 4; }, 'equipado') ? 1 : 0 });
+addDev({ id: 'col_arqueiro', cat: 'Colonos', nome: 'Equipar (arco + 20 flechas) — clique', mapa: (p) => colonoAlvo(p.x, p.y, c => { c.arma = 'arco'; c.escudo = false; c.flechas = 20; }, 'arqueiro') ? 1 : 0 });
+addDev({ id: 'fer', cat: 'Ferimentos', nome: 'Ferir colono (clique)', campos: ['ferida', 'parte', 'sev'], mapa: (p, q, P) => colonoAlvo(p.x, p.y, c => aplicarFerida(c, P.ferida, P.parte, P.sev / 100), `ferida ${P.ferida} em ${PARTES[P.parte].nome}`) ? 1 : 0 });
+for (const [k, n] of FER_DEV) addDev({ id: 'fer_' + k, cat: 'Ferimentos', nome: n + ' (parte escolhida) — clique', campos: ['parte', 'sev'], mapa: (p, q, P) => colonoAlvo(p.x, p.y, c => aplicarFerida(c, k, P.parte, P.sev / 100), `${n.toLowerCase()} em ${PARTES[P.parte].nome}`) ? 1 : 0 });
+for (const [t, nome] of [['parede_madeira', 'Parede de madeira'], ['parede_pedra', 'Parede de pedra'], ['porta', 'Porta'], ['cama', 'Cama'], ['bancada', 'Bancada']])
+  addDev({ id: 'con_' + t, cat: 'Construções', nome: nome + ' (instantânea)', mapa: (p, q) => construirJa(p, q, t), dica: t.startsWith('parede') ? 'arraste: linha, ou retângulo = sala com porta' : '' });
+addDev({ id: 'con_obras', cat: 'Construções', nome: 'Concluir todas as plantas', rodar: () => { const n = mapa.obra.size; for (const o of [...mapa.obra.values()]) concluirObra(o); return n + ' obras'; } });
+addDev({ id: 'ev_chuva', cat: 'Eventos', nome: 'Chuva: ligar', rodar: () => { estado.chuva = { fim: agora() + 6 * 60, forca: estado.chuva ? estado.chuva.forca : 0.2 }; return '6 h'; } });
+addDev({ id: 'ev_semchuva', cat: 'Eventos', nome: 'Chuva: desligar', rodar: () => { if (estado.chuva) estado.chuva.fim = agora(); return 'ok'; } });
+addDev({ id: 'ev_visit', cat: 'Eventos', nome: 'Visitante', rodar: () => dispararEvento('visitante') ? 'chegando' : 'sem caminho' });
+addDev({ id: 'ev_lobos', cat: 'Eventos', nome: 'Ataque de lobos (agora)', rodar: () => { const c = colonos[Math.floor(rnd() * colonos.length)]; const l = ataqueForcado('lobo', c); return l.length + ' lobos atrás de ' + c.nome; } });
+addDev({ id: 'ev_matilha', cat: 'Eventos', nome: 'Matilha chega na borda (noite)', rodar: () => dispararEvento('lobos') ? 'ok' : 'falhou' });
+addDev({ id: 'ev_urso', cat: 'Eventos', nome: 'Urso', rodar: () => dispararEvento('urso') ? 'ok' : 'falhou' });
+addDev({ id: 'ev_urso_atk', cat: 'Eventos', nome: 'Ataque de urso (agora)', rodar: () => { const c = colonos[0]; return ataqueForcado('urso', c).length ? 'atrás de ' + c.nome : 'falhou'; } });
+addDev({ id: 'ev_veados', cat: 'Eventos', nome: 'Manada de veados', rodar: () => dispararEvento('veados') ? 'ok' : 'falhou' });
+for (const [m, n] of [[60, '+1 hora'], [360, '+6 horas'], [1440, '+1 dia']]) addDev({ id: 'tp_' + m, cat: 'Tempo', nome: 'Avançar ' + n, rodar: () => { avancarTempo(m); return 'agora ' + pad2(Math.floor(horaDoDia())) + 'h'; } });
+addDev({ id: 'tp_hora', cat: 'Tempo', nome: 'Ir para a hora…', campos: ['hora'], rodar: P => { const alvo = ((P.hora | 0) % 24 + 24) % 24; let falta = (alvo * 60 - (estado.minutos % 1440) + 1440) % 1440; if (falta < 1) falta = 1440; avancarTempo(falta); return pad2(alvo) + ':00'; } });
+addDev({ id: 'apagar', cat: 'Ferramentas', nome: 'Apagar coisa (clique/arraste)', mapa: (p, q) => { const tipos = {}; const n = porTile(p, q, (x, y) => { const r = apagarEm(x, y); if (r) tipos[r] = (tipos[r] || 0) + 1; return !!r; }); devAcao.ultimo = Object.entries(tipos).map(([k, v]) => v + ' ' + k).join(', '); return n; }, dica: 'animal, visitante, item, colono, construção, árvore, toco, rocha, plantação ou zona' });
+addDev({ id: 'revelar_mapa', cat: 'Ferramentas', nome: 'Ver o mapa inteiro', rodar: () => { camera.zoom = CONFIG.ZOOM_MIN; camera.x = mapa.L * T / 2; camera.y = mapa.A * T / 2; return 'ok'; } });
+for (const [k, n] of [['obraInstantanea', 'Construção instantânea'], ['fabricaInstantanea', 'Fabricação instantânea'], ['semFome', 'Sem fome'], ['semSono', 'Sem sono'], ['revelar', 'Revelar (rótulos de todos os animais)']])
+  addDev({ id: 'tg_' + k, cat: 'Modo deus', nome: n, toggle: k, rodar: () => { devCfg[k] = !devCfg[k]; return devCfg[k] ? 'LIGADO' : 'desligado'; } });
+
+/* ---------- painel ---------- */
+const devPar = { qtd: 25, nome: '', ferida: 'corte', parte: 'bracoE', sev: 50, hora: 12 };
+let devCat = 'Todas', devBusca = '';
+function abrirPainelDev() { $('devPainel').style.display = 'block'; $('devPainel').classList.remove('mini'); desenharPainelDev(); }
+function desenharPainelDev() {
+  const el = $('devPainel'), cats = ['Todas', ...new Set(ACOES_DEV.map(a => a.cat))];
+  const b = devBusca.toLowerCase(), lista = ACOES_DEV.filter(a => (devCat === 'Todas' || a.cat === devCat) && (!b || (a.nome + ' ' + a.cat).toLowerCase().includes(b)));
+  const campo = k => k === 'qtd' ? `<label>Quantidade <input data-par="qtd" type="number" min="1" max="999" value="${devPar.qtd}"></label>`
+    : k === 'nome' ? `<label>Nome <input data-par="nome" type="text" maxlength="16" placeholder="aleatório" value="${devPar.nome}"></label>`
+    : k === 'ferida' ? `<label>Tipo <select data-par="ferida">${FER_DEV.map(([v, n]) => `<option value="${v}"${v === devPar.ferida ? ' selected' : ''}>${n}</option>`).join('')}</select></label>`
+    : k === 'parte' ? `<label>Parte <select data-par="parte">${PARTES_OPC().map(([v, n]) => `<option value="${v}"${v === devPar.parte ? ' selected' : ''}>${n}</option>`).join('')}</select></label>`
+    : k === 'sev' ? `<label>Gravidade <input data-par="sev" type="range" min="10" max="95" value="${devPar.sev}"> ${devPar.sev}%</label>`
+    : k === 'hora' ? `<label>Hora <input data-par="hora" type="number" min="0" max="23" value="${devPar.hora}"></label>` : '';
+  el.innerHTML = `<div class="devTopo"><b>🛠 Modo Dev</b><span class="devX" data-dv="min" title="Minimizar">▁</span><span class="devX" data-dv="fechar" title="Fechar">✕</span></div>
+    <input class="devBusca" type="search" placeholder="Buscar ação…" value="${devBusca.replace(/"/g, '&quot;')}">
+    <div class="devCats">${cats.map(c => `<span class="ordem${c === devCat ? ' sel' : ''}" data-cat="${c}">${c}</span>`).join('')}</div>
+    ${devAcao && devAcao.campos ? `<div class="devPar"><b>${devAcao.nome}</b>${devAcao.campos.map(campo).join('')}</div>` : ''}
+    <div class="devLista">${lista.map(a => `<div class="devItem${devAcao === a ? ' sel' : ''}" data-acao="${a.id}"><span class="devCat">${a.cat}</span>${a.nome}${a.toggle ? ` <b style="color:${devCfg[a.toggle] ? '#7f7' : '#888'}">${devCfg[a.toggle] ? 'ON' : 'off'}</b>` : a.mapa ? ' <span style="color:#9cf">📍</span>' : ''}</div>`).join('') || '<div class="breve">Nada encontrado.</div>'}</div>
+    <div class="devRodape"><span class="ordem" data-dv="sair">⏻ Sair do modo dev</span></div>`;
+}
+function escolherAcaoDev(a) {
+  if (a.rodar) { const r = a.rodar(devPar); devLog(`${a.nome}${r ? ' → ' + r : ''}`); devAcao = null; if (modo === 'dev') definirModo(null); desenharPainelDev(); return r; }
+  devAcao = a; NOME_MODO.dev = '🛠 ' + a.nome + (a.dica ? ' (' + a.dica + ')' : ''); definirModo('dev');
+  desenharPainelDev(); if (!a.campos) $('devPainel').classList.add('mini');
+}
+function devAplicar(a, b) {
+  if (!devAtivo || !devAcao || !devAcao.mapa) return;
+  devAcao.ultimo = '';
+  const n = devAcao.mapa(a, b, devPar);
+  if (n) devLog(`${devAcao.nome}: ${n}${devAcao.ultimo ? ' (' + devAcao.ultimo + ')' : ''} em ${a.x},${a.y}${a.x !== b.x || a.y !== b.y ? '→' + b.x + ',' + b.y : ''}`);
+  else if (n === 0 && !devAcao.id.startsWith('col_') && devAcao.id !== 'fer' && !devAcao.id.startsWith('fer_')) mostrarToast('Nada colocado aqui');
+}
+function atualizarDev() {
+  if (!devAtivo) return;
+  if (devCfg.semFome) for (const c of colonos) c.fome = 100;
+  if (devCfg.semSono) for (const c of colonos) c.sono = Math.max(c.sono, 95);
+  if (devCfg.obraInstantanea && mapa.obra.size) for (const o of [...mapa.obra.values()]) concluirObra(o);
+  if (devCfg.fabricaInstantanea && mapa.bancadas.length) {
+    for (const b of mapa.bancadas) if (b.fazendo) b.progresso = b.total;
+    while (estado.pedidos.length) { const tipo = estado.pedidos.shift(), R = RECEITAS[tipo], bc = mapa.bancadas[0], p = livrePerto(bc.x, bc.y) || bc;
+      for (const [k, q] of Object.entries(R.saida || { [tipo]: 1 })) largarItem(p.x, p.y, k, q); estado.stats.fabricados++; devLog(`fabricado na hora: ${R.nome}`); }
+  }
+}
+function instalarDev() {
+  for (const [id, cls] of [['devDlg', ''], ['devPainel', 'painel'], ['devBadge', '']]) if (!$(id)) { const d = document.createElement('div'); d.id = id; if (cls) d.className = cls; d.style.display = 'none'; document.body.appendChild(d); }
+  $('devBadge').textContent = 'MODO DEV'; $('devBadge').onclick = () => abrirPainelDev();
+  const st = document.createElement('style'); st.textContent = `
+  #devDlg{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.55);align-items:center;justify-content:center}
+  #devDlg .caixa{width:min(320px,90vw);padding:14px 16px;background:#1d2126;border:1px solid #c9a24a}
+  #devDlg input{display:block;width:100%;box-sizing:border-box;margin:6px 0;padding:8px;background:#111417;color:#eee;border:1px solid #555;border-radius:4px;font-size:16px}
+  #devDlg .msgDev{color:#ff8a7a;min-height:18px;font-size:13px;margin:4px 0}
+  .treme{animation:devTreme .42s}
+  @keyframes devTreme{0%,100%{transform:translateX(0)}15%{transform:translateX(-11px)}30%{transform:translateX(10px)}45%{transform:translateX(-8px)}60%{transform:translateX(6px)}75%{transform:translateX(-3px)}}
+  #devBadge{position:fixed;left:8px;bottom:calc(46px + env(safe-area-inset-bottom));z-index:12;background:#7a1d1d;color:#ffd8a0;font:bold 11px sans-serif;letter-spacing:1px;padding:3px 8px;border:1px solid #e2a03a;border-radius:3px;cursor:pointer}
+  body.toque #devBadge{bottom:calc(80px + env(safe-area-inset-bottom))}
+  #devPainel{position:fixed;right:8px;top:56px;width:min(350px,94vw);max-height:calc(100dvh - 130px);overflow:auto;z-index:13;background:rgba(14,16,19,.96);border:1px solid #c9a24a;padding:6px 8px;font-size:13px;-webkit-overflow-scrolling:touch}
+  body.toque #devPainel{right:3vw;top:calc(52px + env(safe-area-inset-top));max-height:58dvh}
+  #devPainel.mini{max-height:none;height:auto}#devPainel.mini>:not(.devTopo){display:none}
+  #devPainel .devTopo{display:flex;align-items:center;gap:6px;color:#ffd770}#devPainel .devTopo b{flex:1}
+  .devX{cursor:pointer;padding:2px 9px;border:1px solid #555;border-radius:3px}
+  .devBusca{width:100%;box-sizing:border-box;margin:5px 0;padding:6px;background:#0b0d0f;color:#eee;border:1px solid #555;font-size:15px}
+  .devCats .ordem{padding:2px 7px;margin:1px;font-size:12px}
+  .devItem{padding:7px 6px;border-bottom:1px solid rgba(255,255,255,.06);cursor:pointer;color:#ddd}.devItem:hover{background:rgba(255,255,255,.07)}.devItem.sel{background:rgba(201,162,74,.25);color:#fff}
+  .devCat{display:inline-block;min-width:76px;color:#888;font-size:11px}
+  .devPar{margin:6px 0;padding:6px;background:rgba(201,162,74,.12);border-radius:4px}.devPar label{display:block;margin:4px 0;color:#ccc}
+  .devPar input,.devPar select{background:#0b0d0f;color:#eee;border:1px solid #555;font-size:14px;max-width:150px}
+  .devRodape{margin-top:6px}
+  .msg.dev{border-left-color:#e2a03a!important;color:#ffd8a0}`;
+  document.head.appendChild(st);
+  $('devDlg').addEventListener('click', e => { const b = e.target.closest('[data-dlg]'); if (!b) return; if (b.dataset.dlg === 'ok') confirmarDlg(); else $('devDlg').style.display = 'none'; });
+  $('devDlg').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); confirmarDlg(); } if (e.key === 'Escape') $('devDlg').style.display = 'none'; e.stopPropagation(); });
+  const P = $('devPainel');
+  P.addEventListener('click', e => {
+    const t = e.target.closest('[data-acao],[data-cat],[data-dv]'); if (!t) return;
+    if (t.dataset.acao) { escolherAcaoDev(ACOES_DEV.find(a => a.id === t.dataset.acao)); return; }
+    if (t.dataset.cat) { devCat = t.dataset.cat; desenharPainelDev(); return; }
+    const k = t.dataset.dv;
+    if (k === 'fechar') { P.style.display = 'none'; if (modo === 'dev') definirModo(null); }
+    else if (k === 'min') P.classList.toggle('mini');
+    else if (k === 'sair') sairDev();
+  });
+  P.addEventListener('input', e => {
+    if (e.target.classList.contains('devBusca')) { devBusca = e.target.value; const pos = e.target.selectionStart; desenharPainelDev(); const i = P.querySelector('.devBusca'); i.focus(); try { i.setSelectionRange(pos, pos); } catch (er) {} return; }
+    const k = e.target.dataset.par; if (!k) return; devPar[k] = k === 'nome' || k === 'ferida' || k === 'parte' ? e.target.value : +e.target.value;
+    if (k === 'sev') e.target.parentNode.lastChild.textContent = ' ' + devPar.sev + '%';
+  });
+  P.addEventListener('change', e => { const k = e.target.dataset && e.target.dataset.par; if (k) devPar[k] = k === 'nome' || k === 'ferida' || k === 'parte' ? e.target.value : +e.target.value; });
+  P.addEventListener('keydown', e => e.stopPropagation());
+  if (lsGet(DEV_FLAG) === '1') { devAtivo = true; $('devBadge').style.display = 'block'; }
+}
+instalarDev();
+window.DEV = { ACOES_DEV, escolherAcaoDev, devAplicar, devCfg, hashSenha, sha256js, apagarEm, criarColonoExtra, abrirModoDev, sairDev, get ativo() { return devAtivo; } };
+
 /* =============================== LOOP =============================== */
 function redimensionar() { canvas.width = Math.floor(innerWidth * dpr()); canvas.height = Math.floor(innerHeight * dpr()); }
 window.addEventListener('resize', redimensionar);
@@ -5088,6 +5376,7 @@ function passoSimulacao(dtReal) {
   for (const c of colonos) atualizarColono(c, dt, minutos / 60);
   for (const v of visitantes.slice()) atualizarVisitante(v, dt);
   atualizarV8(dt, minutos);
+  atualizarDev();
   atualizarConversas(dt);
   atualizarQuedas(dt);
   atualizarChuva(minutos / 60);
