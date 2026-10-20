@@ -3104,6 +3104,13 @@ function definirModo(m) {
   el.textContent = !m ? '' : PLANTAS[m] ? `${NOME_MODO[m]} (${textoCusto(PLANTAS[m].custo)}) — ${m.startsWith('parede') ? 'arraste: linha, ou retângulo = sala com porta' : 'clique para posicionar'} · Esc / botão direito para sair`
     : `${NOME_MODO[m]} — clique ou arraste sobre o mapa · Esc / botão direito para sair`;
   document.body.classList.toggle('comModo', !!m);
+  let bc = $('cancelarModo');
+  if (!bc) { bc = document.createElement('button'); bc.id = 'cancelarModo'; bc.textContent = '✖ Cancelar';
+    bc.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);top:calc(56px + env(safe-area-inset-top));z-index:60;min-width:150px;min-height:48px;padding:10px 22px;font:bold 18px sans-serif;color:#fff;background:#b3261e;border:2px solid #ffd8a0;border-radius:24px;box-shadow:0 2px 10px rgba(0,0,0,.6);touch-action:manipulation;cursor:pointer';
+    const sair = e => { e.preventDefault(); e.stopPropagation(); if (modo === 'dev') devAcao = null; definirModo(null); if ($('devPainel') && $('devPainel').style.display !== 'none') desenharPainelDev(); };
+    bc.addEventListener('click', sair); bc.addEventListener('touchend', sair, { passive: false }); bc.addEventListener('touchstart', e => e.stopPropagation(), { passive: true });
+    document.body.appendChild(bc); }
+  bc.style.display = m ? 'block' : 'none';
   if (m && EH_TOQUE) el.textContent = `${NOME_MODO[m]}${PLANTAS[m] ? ' (' + textoCusto(PLANTAS[m].custo) + ')' : ''} — toque ou arraste no mapa · segure ou toque no botão de novo para sair`;
   atualizarBarraToque();
   canvas.style.cursor = m ? 'crosshair' : 'default';
@@ -3135,7 +3142,7 @@ window.addEventListener('keydown', e => {
   if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return; // digitando num campo
   if (e.code === 'Tab') { e.preventDefault(); const i = colonos.indexOf(selecionado); selecionar(colonos[(i + 1) % colonos.length], true); return; }
   if (e.code === 'Space') { e.preventDefault(); alternarPausa(); return; }
-  if (e.code === 'Escape') { if (modo) definirModo(null); else { selecionar(null); inspecao = null; abrirAba(null); } return; }
+  if (e.code === 'Escape') { if ($('devDlg') && $('devDlg').style.display !== 'none') { $('devDlg').style.display = 'none'; return; } if (modo) { if (modo === 'dev') { devAcao = null; desenharPainelDev(); } definirModo(null); } else { selecionar(null); inspecao = null; abrirAba(null); } return; }
   if (e.key === '1' || e.key === '2' || e.key === '3') { definirVelocidade(+e.key); return; }
   if (e.code === 'KeyC') { definirModo(modo === 'cortar' ? null : 'cortar'); return; }
   if (e.code === 'KeyM') { definirModo(modo === 'minerar' ? null : 'minerar'); return; }
@@ -3157,6 +3164,7 @@ window.addEventListener('keyup', e => { teclas[e.code] = false; });
 window.addEventListener('blur', () => { for (const k in teclas) teclas[k] = false; });
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 canvas.addEventListener('mousedown', e => {
+  if (Date.now() - toqueUlt < 800) return; // mouse sintético após toque
   mouse.botao = e.button; mouse.inicioX = e.clientX; mouse.inicioY = e.clientY; mouse.moveu = false;
   mouse.x = e.clientX; mouse.y = e.clientY;
   mouse.tile = telaParaTile(e.clientX, e.clientY);
@@ -3177,6 +3185,7 @@ window.addEventListener('mousemove', e => {
   mouse.tile = telaParaTile(e.clientX, e.clientY);
 });
 window.addEventListener('mouseup', e => {
+  if (e.target !== canvas || Date.now() - toqueUlt < 800) { if (e.button === 0) mouse.arrastoIni = null; mouse.botao = -1; return; } // UI nunca aplica ordem no mapa
   if (e.button === 0 && modo && mouse.arrastoIni) { aplicarOrdens(mouse.arrastoIni, telaParaTile(e.clientX, e.clientY)); mouse.arrastoIni = null; }
   if (e.button === 2 && mouse.botao === 2 && !mouse.moveu) {
     if (modo) definirModo(null);
@@ -3222,6 +3231,7 @@ function atualizarCamera(dtReal) {
 /* ============================== TOQUE =============================== */
 // 1 dedo arrasta a câmera; pinça = zoom; toque = selecionar; segurar ~400 ms = mandar andar.
 // Em modo de ordem (cortar/minerar/construir/cancelar), 1 dedo marca (toque ou arrasto) e 2 dedos movem/zoom.
+let toqueUlt = 0; document.addEventListener('touchstart', () => { toqueUlt = Date.now(); }, { capture: true, passive: true });
 const toque = { dedos: new Map(), gesto: null, ini: null, ult: null, timer: 0, longo: false, pinca: null };
 function centroDedos() { const v = [...toque.dedos.values()]; return { x: (v[0].x + v[1].x) / 2, y: (v[0].y + v[1].y) / 2, d: Math.hypot(v[0].x - v[1].x, v[0].y - v[1].y) || 1 }; }
 function iniciarPinca() {
@@ -3245,7 +3255,7 @@ function tocarEm(x, y) {
   else { selecionar(null); const an = animalEmTela(x, y), t = telaParaTile(x, y); inspecao = an ? { x: Math.round(an.x), y: Math.round(an.y), animal: an } : dentro(t.x, t.y) ? t : null; }
 }
 canvas.addEventListener('touchstart', e => {
-  e.preventDefault();
+  e.preventDefault(); if (e.target !== canvas) return;
   for (const t of e.changedTouches) toque.dedos.set(t.identifier, { x: t.clientX, y: t.clientY });
   if (toque.dedos.size === 1) {
     const t = e.changedTouches[0];
@@ -3281,7 +3291,7 @@ function fimToque(e) {
   }
   if (toque.dedos.size) return;
   clearTimeout(toque.timer);
-  if (e.type === 'touchend' && !toque.longo) {
+  if (e.type === 'touchend' && !toque.longo && e.target === canvas) {
     if (modo && mouse.arrastoIni) aplicarOrdens(mouse.arrastoIni, mouse.tile || mouse.arrastoIni);
     else if (toque.gesto === 'talvez') tocarEm(toque.ini.x, toque.ini.y);
   }
@@ -6095,7 +6105,7 @@ for (const [k, n] of [['obraInstantanea', 'Construção instantânea'], ['fabric
   addDev({ id: 'tg_' + k, cat: 'Modo deus', nome: n, toggle: k, rodar: () => { devCfg[k] = !devCfg[k]; return devCfg[k] ? 'LIGADO' : 'desligado'; } });
 
 /* ---------- painel ---------- */
-const devPar = { qtd: 25, nome: '', ferida: 'corte', parte: 'bracoE', sev: 50, hora: 12 };
+const devPar = { repetir: false, qtd: 25, nome: '', ferida: 'corte', parte: 'bracoE', sev: 50, hora: 12 };
 let devCat = 'Todas', devBusca = '';
 function abrirPainelDev() { $('devPainel').style.display = 'block'; $('devPainel').classList.remove('mini'); desenharPainelDev(); }
 function desenharPainelDev() {
@@ -6112,7 +6122,7 @@ function desenharPainelDev() {
     <div class="devCats">${cats.map(c => `<span class="ordem${c === devCat ? ' sel' : ''}" data-cat="${c}">${c}</span>`).join('')}</div>
     ${devAcao && devAcao.campos ? `<div class="devPar"><b>${devAcao.nome}</b>${devAcao.campos.map(campo).join('')}</div>` : ''}
     <div class="devLista">${lista.map(a => `<div class="devItem${devAcao === a ? ' sel' : ''}" data-acao="${a.id}"><span class="devCat">${a.cat}</span>${a.nome}${a.toggle ? ` <b style="color:${devCfg[a.toggle] ? '#7f7' : '#888'}">${devCfg[a.toggle] ? 'ON' : 'off'}</b>` : a.mapa ? ' <span style="color:#9cf">📍</span>' : ''}</div>`).join('') || '<div class="breve">Nada encontrado.</div>'}</div>
-    <div class="devRodape"><span class="ordem" data-dv="sair">⏻ Sair do modo dev</span></div>`;
+    <div class="devRodape"><span class="ordem${devPar.repetir ? ' sel' : ''}" data-dv="repetir">🔁 Repetir: ${devPar.repetir ? 'ON' : 'off'}</span> <span class="ordem" data-dv="sair">⏻ Sair do modo dev</span></div>`;
 }
 function escolherAcaoDev(a) {
   if (a.rodar) { const r = a.rodar(devPar); devLog(`${a.nome}${r ? ' → ' + r : ''}`); devAcao = null; if (modo === 'dev') definirModo(null); desenharPainelDev(); return r; }
@@ -6125,6 +6135,7 @@ function devAplicar(a, b) {
   const n = devAcao.mapa(a, b, devPar);
   if (n) devLog(`${devAcao.nome}: ${n}${devAcao.ultimo ? ' (' + devAcao.ultimo + ')' : ''} em ${a.x},${a.y}${a.x !== b.x || a.y !== b.y ? '→' + b.x + ',' + b.y : ''}`);
   else if (n === 0 && !devAcao.id.startsWith('col_') && devAcao.id !== 'fer' && !devAcao.id.startsWith('fer_')) mostrarToast('Nada colocado aqui');
+  if (n && !devPar.repetir) { devAcao = null; definirModo(null); if ($('devPainel').style.display !== 'none') desenharPainelDev(); } // 1 por seleção
 }
 function atualizarDev() {
   if (!devAtivo) return;
@@ -6174,6 +6185,7 @@ function instalarDev() {
     if (k === 'fechar') { P.style.display = 'none'; if (modo === 'dev') definirModo(null); }
     else if (k === 'min') P.classList.toggle('mini');
     else if (k === 'sair') sairDev();
+    else if (k === 'repetir') { devPar.repetir = !devPar.repetir; desenharPainelDev(); }
   });
   P.addEventListener('input', e => {
     if (e.target.classList.contains('devBusca')) { devBusca = e.target.value; const pos = e.target.selectionStart; desenharPainelDev(); const i = P.querySelector('.devBusca'); i.focus(); try { i.setSelectionRange(pos, pos); } catch (er) {} return; }
