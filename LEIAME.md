@@ -358,3 +358,25 @@ Nada de desenhar zonas ou linhas: a formação nasce sozinha quando 2+ colonos e
 - **Modo dev** (mesma senha): *Combate v11* → bandos de bandidos pequeno, médio ou grande (escudo, arqueiro, espada), forçar pânico, equipar escudo pesado ou arco longo. Os bandidos usam a mesma formação e a mesma IA, fogem em pânico e largam as armas ao morrer.
 - Corrigido: inspecionar um colono armado dava `ARMAS is not defined`.
 - Saves da v10 continuam carregando (os campos novos têm valor padrão).
+
+## v12 — lanças, materiais, defesa, ervas, animação do escudo e quadrado de 16
+
+**Equilíbrio (1 ataque forçado por dia, 7 dias, sementes 1234/77/5, 3 repetições):** armados 27/27 colonos vivos, desarmados 27/27 (v11: armados 16/27, desarmados 15/27 com a mesma bateria; antes das mudanças de combate, só com a infecção corrigida).
+- Infecção: tratar + limpar corta a chance para ~0,7% (sem tratar ~15%); progride ~46%/dia sem tratar (era ~72%); o tratamento segura por 15 h.
+- Lobos/ursos desistem depois de alguns golpes (antes se mais aliados armados estiverem perto) e fogem mais cedo (lobo < 70% de vida, urso < 50%); quando alguém cai, a matilha forçada vai embora.
+- Quem recua corre para perto de um aliado armado (não para longe, sozinho) e não volta à luta logo em seguida.
+- Resgate garantido: um colono caído sem inimigo por perto é buscado pelo colono livre mais próximo, mesmo sem prioridade de médico.
+
+**Armas:** espada (alcance 1) e lança (alcance 2) de **madeira** ou **pedra** (pedra fere mais; madeira 9/8,5 × pedra 15/13,5). A "Espada" antiga virou "Espada de pedra" (saves antigos continuam iguais). A lança estoca da 2ª fileira atrás dos escudos e por cima de paliçada/muro; a espada não passa por cima de muro. Lanceiros contam como linha de frente. A IA põe armas na fila da bancada quando falta arma (pedra se houver, senão madeira), marca árvores/rochas para cortar/minerar quando falta material e troca madeira por pedra depois.
+
+**Arqueiros:** atiram por cima de aliados e de cobertura baixa (rocha, paliçada) em qualquer ponto do caminho; árvores e paredes cheias pesam na mira e bloqueiam se forem muitas.
+
+**Defesa:** Arquitetar → *Paliçada (muro baixo)* (4 madeiras: bloqueia a passagem, dá cobertura, lança e flecha passam por cima) e *Estacas (armadilha)* (3 madeiras: perfuram as pernas pela saúde por partes e deixam o atacante a 45% da velocidade).
+
+**Ervas medicinais:** planta silvestre (flores brancas) colhida pela Coleta; na bancada viram *Remédio de ervas* (x2) e *Bandagens boas* (agora 3 ervas, sem pele/frutas). O médico usa o melhor que tiver: ervas > bandagem boa > simples. Ervas cortam a chance de infecção para 1/4 e curam 1,5× mais rápido.
+
+**Animação do escudo (sprite de verdade):** o braço leva o escudo do lado para a frente em arco (~0,4 s, quadros interpolados), o corpo se inclina contra o escudo na formação e ao andar em formação, recua com o golpe e volta, ergue o escudo acima da cabeça com as duas mãos para o teto e baixa. Montagem: `v12_escudo_anim.png`.
+
+**Quadrado:** só forma com 16 de corpo a corpo (12 na parede: 3 frente, 3 esquerda, 3 direita, 3 trás, empurrando o escudo para fora com a lança/espada entre os escudos; 4 no meio com o escudo para cima formando o teto). Com menos, forma só a linha de escudos (a ordem "Formar quadrado" é recusada). Com mais de 16, os lados crescem (4+) e sobra mais gente para o teto. Arqueiros nunca vão para a parede: ficam atrás da linha ou dentro do quadrado. Depois de formado, o quadrado segura com baixas (as vagas ficam abertas, ninguém é inventado). Um ferido lá fora: **um** dos 4 do teto sai, arrasta o ferido para dentro e volta ao teto. Modo dev: "16 colonos armados" (Combate v11) e itens/equipar das armas novas (Armas v12).
+
+Testes v12 (headless Chrome, desktop + iPhone 13): suíte v10 39/39; suíte v11 29/29 em cada aparelho com o cenário do quadrado ajustado para 16 colonos (a suíte v11 original dá 25/29 porque esperava quadrado com 6 colonos, o que a nova regra proíbe); suíte v12 39/39 em cada aparelho; sem erros no console. Capturas: `v12_armas.png`, `v12_lancas.png`, `v12_combate.png`, `v12_defesa.png`, `v12_quadrado16.png`, `v12_quadrado16_anim.png`, `v12_escudo_anim.png`, `v12_ios.png`.

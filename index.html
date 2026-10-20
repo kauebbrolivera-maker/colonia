@@ -549,7 +549,7 @@ const ITEM = {
   MILHO:   { nome: 'Milho', max: 75 },
   MACHADO: { nome: 'Machado', max: 1, ferramenta: 'machado' },
   PICARETA: { nome: 'Picareta', max: 1, ferramenta: 'picareta' },
-  ESPADA: { nome: 'Espada', max: 1, equip: 'arma' }, ARCO: { nome: 'Arco', max: 1, equip: 'arma' }, ESCUDO: { nome: 'Escudo', max: 1, equip: 'escudo' },
+  ESPADA: { nome: 'Espada de pedra', max: 1, equip: 'arma' }, ARCO: { nome: 'Arco', max: 1, equip: 'arma' }, ESCUDO: { nome: 'Escudo', max: 1, equip: 'escudo' },
   FLECHAS: { nome: 'Flechas', max: 40, equip: 'municao' }, BANDAGEM: { nome: 'Bandagem simples', max: 20, equip: 'medico' }, BANDAGEM_BOA: { nome: 'Bandagem boa', max: 20, equip: 'medico' },
   CARNE: { nome: 'Carne', max: 75 }, PELE: { nome: 'Pele', max: 30 },
   CARC_VEADO: { nome: 'Carcaça de veado', max: 1 }, CARC_LOBO: { nome: 'Carcaça de lobo', max: 1 }, CARC_URSO: { nome: 'Carcaça de urso', max: 1 },
@@ -691,7 +691,7 @@ function aEstrela(sx, sy, ex, ey, adj = false, limite = 30000) {
    mapa.estrutura (por tile): 0 nada · 1 parede de madeira · 2 parede de pedra · 3 cama · 4 bancada
    mapa.obra: plantas (blueprints) esperando material / construção.
    Paredes e bancada bloqueiam o caminho; cama é passável.                           */
-const ESTR = { PAREDE_MADEIRA: 1, PAREDE_PEDRA: 2, CAMA: 3, BANCADA: 4, PORTA: 5 };
+const ESTR = { PAREDE_MADEIRA: 1, PAREDE_PEDRA: 2, CAMA: 3, BANCADA: 4, PORTA: 5, PALICADA: 6, ESTACAS: 7 };
 // telhado automático: o que não se alcança da borda sem atravessar parede/porta é "dentro" (salas até 150 tiles)
 function calcularTelhado(avisar) {
   const L = mapa.L, A = mapa.A, n = L * A, fora = new Uint8Array(n), fila = new Int32Array(n);
@@ -728,20 +728,22 @@ const PLANTAS = {
   cama:           { estr: 3, nome: 'Cama',              custo: { MADEIRA: 10 }, tempo: 80 },
   bancada:        { estr: 4, nome: 'Bancada de trabalho', custo: { MADEIRA: 15 }, tempo: 100 },
   porta:          { estr: 5, nome: 'Porta', custo: { MADEIRA: 6 }, tempo: 50 },
+  palicada:       { estr: 6, nome: 'Paliçada (muro baixo)', custo: { MADEIRA: 4 }, tempo: 45 },
+  estacas:        { estr: 7, nome: 'Estacas (armadilha)', custo: { MADEIRA: 3 }, tempo: 35 },
 };
-const PLANTA_DE_ESTR = ['', 'parede_madeira', 'parede_pedra', 'cama', 'bancada', 'porta'];
+const PLANTA_DE_ESTR = ['', 'parede_madeira', 'parede_pedra', 'cama', 'bancada', 'porta', 'palicada', 'estacas'];
 const conectaParede = e => e === 1 || e === 2 || e === 5; // paredes se ligam a portas
 const ehParedeEstr = e => e === 1 || e === 2;
-const bloqueiaEstr = e => e === 1 || e === 2 || e === 4;
+const bloqueiaEstr = e => e === 1 || e === 2 || e === 4 || e === 6; // v12: paliçada (6) bloqueia passagem, estacas (7) não
 const RECEITAS = { // feitas na bancada (materiais saem do estoque quando começa)
   MACHADO:  { nome: 'Machado',  custo: { MADEIRA: 4, PEDRA: 2 }, tempo: 90 },
   PICARETA: { nome: 'Picareta', custo: { MADEIRA: 4, PEDRA: 3 }, tempo: 110 },
-  ESPADA:   { nome: 'Espada',   custo: { MADEIRA: 2, PEDRA: 8 }, tempo: 150 },
+  ESPADA:   { nome: 'Espada de pedra', custo: { MADEIRA: 2, PEDRA: 6 }, tempo: 150 },
   ARCO:     { nome: 'Arco',     custo: { MADEIRA: 8 }, tempo: 120 },
   FLECHAS:  { nome: 'Flechas (x12)', custo: { MADEIRA: 4 }, tempo: 60, saida: { FLECHAS: 12 } },
   ESCUDO:   { nome: 'Escudo',   custo: { MADEIRA: 8, PEDRA: 2 }, tempo: 110 },
   BANDAGEM: { nome: 'Bandagens simples de pele (x3)', custo: { PELE: 1 }, tempo: 40, saida: { BANDAGEM: 3 } },
-  BANDAGEM_BOA: { nome: 'Bandagens boas (pele + frutas, x2)', custo: { PELE: 1, FRUTAS: 6 }, tempo: 60, saida: { BANDAGEM_BOA: 2 } },
+  BANDAGEM_BOA: { nome: 'Bandagens boas (ervas, x2)', custo: { ERVAS: 3 }, tempo: 60, saida: { BANDAGEM_BOA: 2 } },
   BANDAGEM_FIBRA: { nome: 'Bandagem simples de fibra', custo: { FRUTAS: 4 }, tempo: 40, saida: { BANDAGEM: 1 } },
   CARNEAR_VEADO: { nome: 'Carnear veado', custo: { CARC_VEADO: 1 }, tempo: 70, saida: { CARNE: 24, PELE: 2 }, auto: true },
   CARNEAR_LOBO:  { nome: 'Carnear lobo',  custo: { CARC_LOBO: 1 },  tempo: 60, saida: { CARNE: 12, PELE: 2 }, auto: true },
@@ -1920,6 +1922,7 @@ function sol() { // direção/força da sombra conforme a hora (sol nasce a lest
   return { dx: 0.35, el: 0.6, k: 0.3 }; // luar
 }
 function desenharColono(g, c, x, y, p = {}) {
+  v12Mat = (c.arma === 'espada' || c.arma === 'lanca') ? (c.mat12 || 'pedra') : 'pedra';
   const N = Q.nivel, th = p.yaw || 0, s = Math.sin(th), co = Math.cos(th);
   const w = p.w || 0, F = (p.fase || 0) * Math.PI * 2, carrega = p.carregando || null;
   const mola = N === 2 ? (p.mola || 0) : 0;
@@ -1974,6 +1977,7 @@ function desenharColono(g, c, x, y, p = {}) {
   if (p.estende) { const k = p.estende > 0 ? 1 : 0, sd = p.estende; maos[k] = { x: lx * sd * 4 + fx * 8.5, y: 5 + ly * sd * 4 + fy * 8.5, atras: false }; }
   if (p.agacha && !p.acao && !carrega) maos = maos.map((m, k) => ({ x: lx * (k ? 1 : -1) * 4.5 + fx * 5, y: 8 + ly * (k ? 1 : -1) * 4.5 + fy * 5, atras: m.atras }));
   if (p.maosExtra) maos = p.maosExtra(maos, { lx, ly, fx, fy, bw, co, s });
+  if (p.v12) maos = v12Maos(p, maos, { lx, ly, fx, fy, bw, co, s });
   const mao = m => {
     if (N > 0) { const ox = m.x < 0 ? 1 : -1; elipse(g, m.x + ox * 1.6, m.y - 1, 1.1, 0.8, ox * 0.6); g.fillStyle = c.pele; g.fill(); g.lineWidth = 0.8; g.strokeStyle = CONTORNO; g.stroke(); }
     elipse(g, m.x, m.y, 2.3, 2.1); g.fillStyle = c.pele; g.fill(); g.lineWidth = 1.2; g.strokeStyle = CONTORNO; g.stroke();
@@ -1984,7 +1988,7 @@ function desenharColono(g, c, x, y, p = {}) {
   if (carrega && !frente) itemCarregado();
   if (ferr && ferr.atras) desenharFerramenta(g, ferr);
   for (const m of maos) if (m.atras && !m.sobre) mao(m);
-  if ((p.escudo || p.bloqueio) && co < -0.25) desenharEscudoNoColono(g, p, maos, lx, ly, fx, fy);
+  if ((p.escudo || p.bloqueio) && v12EscAtras(p, co)) desenharEscudoNoColono(g, p, maos, lx, ly, fx, fy);
   tronco(g, bw, s, co); g.fillStyle = c.roupa; g.fill();
   g.save(); g.clip();
   if (N > 0) { const gr = g.createLinearGradient(-bw, 0, bw, 0); gr.addColorStop(0, 'rgba(255,255,255,0.10)'); gr.addColorStop(0.55, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,0.22)'); g.fillStyle = gr; g.fillRect(-bw - 2, -4, bw * 2 + 4, 18);
@@ -2007,7 +2011,8 @@ function desenharColono(g, c, x, y, p = {}) {
   for (const m of maos) if (m.sobre) mao(m); // mão na boca (comendo) fica na frente do rosto
   if (prop) prop(g);
   if (p.curativos && p.curativos.length) desenharCurativos(g, p.curativos, maos, lx, ly, bw);
-  if ((p.escudo || p.bloqueio) && co >= -0.25) desenharEscudoNoColono(g, p, maos, lx, ly, fx, fy);
+  if (p.v12 && !p.acao) v12ArmaIdle(g, p, maos, { lx, ly, fx, fy, co });
+  if ((p.escudo || p.bloqueio) && !v12EscAtras(p, co)) desenharEscudoNoColono(g, p, maos, lx, ly, fx, fy);
   g.restore();
   g.restore();
 }
@@ -2065,7 +2070,7 @@ function desenharSpriteColono(g, c, img, x, y) {
 
 // ---------- FERRAMENTAS na mão (machado, picareta, martelo, serra, faca) ----------
 function desenharFerramenta(g, f) {
-  if (f.tipo === 'espada' || f.tipo === 'arco') return desenharArma(g, f);
+  if (f.tipo === 'espada' || f.tipo === 'arco' || f.tipo === 'lanca') return desenharArma(g, f);
   const n = Math.hypot(f.d.x, f.d.y) || 1, ux = f.d.x / n, uy = f.d.y / n, px = -uy, py = ux;
   g.lineCap = 'round'; g.lineJoin = 'round';
   const cabo = (lw, cor) => { g.beginPath(); g.moveTo(f.x0, f.y0); g.lineTo(f.x1, f.y1); g.lineWidth = lw + 1.4; g.strokeStyle = CONTORNO; g.stroke(); g.lineWidth = lw; g.strokeStyle = cor; g.stroke(); };
@@ -2541,7 +2546,7 @@ function desenharLinhaEstruturas(y, x0, x1) {
     else if (e === ESTR.BANCADA) desenharBancada(ctx, x, y, mapa.bancadas.find(b => b.x === x && b.y === y), 'real');
     else {
       const o = mapa.obra.get(i);
-      if (!o || o.tipo === 'cama') continue;
+      if (!o || o.tipo === 'cama' || o.tipo === 'palicada' || o.tipo === 'estacas') continue; // v12: desenhadas pelo módulo v12
       if (o.tipo === 'porta') {
         desenharPorta(ctx, x, y, 'planta', 0);
         if (o.progresso > 0) { ctx.save(); ctx.globalAlpha = o.progresso * 0.85; desenharPorta(ctx, x, y, 'real', 0); ctx.restore(); }
@@ -2564,6 +2569,7 @@ function desenharFantasma() {
   ctx.save(); ctx.globalAlpha = 0.8;
   for (const t of tiles) {
     const ok = podeConstruir(t.x, t.y);
+    if (modo === 'palicada' || modo === 'estacas') { if (ok) (modo === 'palicada' ? v12DesenharPalicada : v12DesenharEstacas)(ctx, t.x, t.y, true); else { ctx.fillStyle = 'rgba(220,60,50,.35)'; ctx.fillRect(t.x * T, t.y * T, T, T); } continue; }
     if (modo === 'cama') { if (ok) desenharCamaMovel(ctx, t.x, t.y, null, true); else { ctx.fillStyle = 'rgba(220,60,50,.35)'; ctx.fillRect(t.x * T, t.y * T, T, T); } }
     else if (modo === 'bancada') desenharBancada(ctx, t.x, t.y, null, ok ? 'planta' : 'invalido');
     else if (t.tipo === 'porta' || modo === 'porta') desenharPorta(ctx, t.x, t.y, ok ? 'planta' : 'invalido', 0, (dx, dy) => set.has((t.y + dy) * 1000 + t.x + dx));
@@ -3825,7 +3831,7 @@ function atualizarAnimal(a, dt) {
   const viu = perceber(a, dt);
   let lento = E.anda;
   // fuga quando muito ferido (predadores) ou partida do mapa
-  if (a.esp !== 'veado' && a.estado !== 'partir' && a.hp < E.hp * (a.esp === 'urso' ? 0.3 : 0.5)) { a.estado = 'partir'; a.caminho = []; log(`O ${E.nome.toLowerCase()} ferido foge!`, 'bom'); }
+  if (a.esp !== 'veado' && a.estado !== 'partir' && a.hp < E.hp * (a.esp === 'urso' ? 0.5 : 0.7)) { a.estado = 'partir'; a.caminho = []; log(`O ${E.nome.toLowerCase()} ferido foge!`, 'bom'); }
   if (a.ate && agora() > a.ate && a.estado !== 'partir' && a.estado !== 'atacar') { a.estado = 'partir'; a.caminho = []; }
   if (a.estado === 'partir') {
     lento = E.corre * 0.9;
@@ -3882,6 +3888,7 @@ function atualizarAnimal(a, dt) {
 function animArma(c) {
   if (c.arma === 'arco' && c.flechas > 0) return 'arco';
   if (c.arma === 'espada') return 'espada';
+  if (c.arma === 'lanca') return 'lanca';
   if (c.ferramentas && c.ferramentas.machado) return 'machado';
   if (c.ferramentas && c.ferramentas.picareta) return 'picareta';
   return 'socar';
@@ -4109,7 +4116,7 @@ function tentarEquipar(c) {
 function equipar(c, it) {
   const tp = it.tipo;
   if (tp === 'ESPADA' || tp === 'ARCO') {
-    if (c.arma) largarItem(Math.round(c.x), Math.round(c.y), c.arma.toUpperCase(), 1);
+    if (c.arma) largarItem(Math.round(c.x), Math.round(c.y), armaItem12(c), 1);
     c.arma = tp.toLowerCase(); removerItem(it);
     if (c.arma === 'arco' && c.escudo) { c.escudo = false; largarItem(Math.round(c.x), Math.round(c.y), 'ESCUDO', 1); log(`${c.nome} deixou o escudo: o arco usa as duas mãos.`); }
   } else if (tp === 'ESCUDO') { if (c.arma === 'arco') { it.reservado = null; return; } c.escudo = true; removerItem(it); }
@@ -4229,12 +4236,12 @@ function executarV8(c, dt, min) {
       if (!v11Valido(a) && !(a && a.animal && !a.morto && animais.includes(a))) { fim(c); c.pensarT = 1; return true; }
       if (!t.cacada && !t.job && v11Lutar(c, t, dt)) return true;
       if (t.presa !== a) return true;
-      if (!t.job && !t.cacada && ((saude(c).dor || 0) > 0.6 || capDe(c).movimento < 0.35) && !(a.saude && a.saude.caido)) { log(`${c.nome}, muito ferido(a), recua do ${a.nome.toLowerCase()}.`, 'ruim'); fim(c); iniciarFuga(c, a); return true; }
+      if (!t.job && !t.cacada && ((saude(c).dor || 0) > 0.55 || capDe(c).movimento < 0.38 || perdaSangue(c) > 32) && !(a.saude && a.saude.caido)) { log(`${c.nome}, muito ferido(a), recua do ${a.nome.toLowerCase()}.`, 'ruim'); fim(c); iniciarFuga(c, a); return true; }
       t.ini = t.ini || agora();
       if (t.segurar && t.cacada && cacadas.includes(t.cacada) && agora() - t.ini < 30 && t.segurar(c, t)) { c.caminho = []; c.agachado = true; virarPara(c, a.x, a.y); return true; }
       c.agachado = false;
       const d = Math.hypot(a.x - c.x, a.y - c.y), arco = c.arma === 'arco' && c.flechas > 0;
-      const alcance = arco ? (c.arcoLongo ? 10 : 7.5) : (a.saude && a.saude.caido ? 2.1 : 1.9); // inclui a diagonal (e o tamanho do bicho)
+      const alcance = arco ? (c.arcoLongo ? 10 : 7.5) : alcMelee12(c, a); // inclui a diagonal (e o tamanho do bicho)
       t.rp -= dt;
       t.ini = t.ini || agora();
       const fugindo = a.estado === 'partir' && d > alcance + 1.5, limite = t.cacada ? 300 : t.job ? 360 : 150;
@@ -4325,7 +4332,7 @@ function autoPedidos() {
   for (const esp of ['VEADO', 'LOBO', 'URSO']) if ((est['CARC_' + esp] || 0) > q('CARNEAR_' + esp)) { estado.pedidos.push('CARNEAR_' + esp); log(`Pedido automático: carnear ${esp.toLowerCase()}.`); }
   const band = (est.BANDAGEM || 0) + (est.BANDAGEM_BOA || 0) + colonos.reduce((s, c) => s + (c.bandagens || 0) + (c.bandBoas || 0), 0);
   if (band + 3 * q('BANDAGEM') + 2 * q('BANDAGEM_BOA') + q('BANDAGEM_FIBRA') < 4) {
-    if ((est.PELE || 0) >= 1 && (est.FRUTAS || 0) >= 30) estado.pedidos.push('BANDAGEM_BOA'); else if ((est.PELE || 0) >= 1) estado.pedidos.push('BANDAGEM'); else if ((est.FRUTAS || 0) >= 40) estado.pedidos.push('BANDAGEM_FIBRA');
+    if ((est.ERVAS || 0) >= 3) estado.pedidos.push('BANDAGEM_BOA'); else if ((est.PELE || 0) >= 1) estado.pedidos.push('BANDAGEM'); else if ((est.FRUTAS || 0) >= 40) estado.pedidos.push('BANDAGEM_FIBRA');
   }
   if (q('FLECHAS') === 0 && colonos.some(c => c.arma === 'arco' && c.flechas < 8) && !(est.FLECHAS > 4) && (est.MADEIRA || 0) >= 10) estado.pedidos.push('FLECHAS');
 }
@@ -4446,8 +4453,9 @@ function desenharArma(g, f) {
     g.beginPath(); g.moveTo(f.x0 - ux * 2.5, f.y0 - uy * 2.5); g.lineTo(f.x0 + ux * 1, f.y0 + uy * 1); g.lineWidth = 3; g.strokeStyle = CONTORNO; g.stroke(); g.lineWidth = 1.8; g.strokeStyle = '#6a4a2a'; g.stroke();
     g.beginPath(); g.moveTo(f.x0 + ux * 1.2 - px * 3, f.y0 + uy * 1.2 - py * 3); g.lineTo(f.x0 + ux * 1.2 + px * 3, f.y0 + uy * 1.2 + py * 3); g.lineWidth = 3; g.strokeStyle = CONTORNO; g.stroke(); g.lineWidth = 1.8; g.strokeStyle = '#c9a640'; g.stroke();
     g.beginPath(); g.moveTo(f.x0 + ux * 1.5 - px * 1.2, f.y0 + uy * 1.5 - py * 1.2); g.lineTo(f.x1, f.y1); g.lineTo(f.x0 + ux * 1.5 + px * 1.2, f.y0 + uy * 1.5 + py * 1.2); g.closePath();
-    g.fillStyle = '#d7dbe0'; g.fill(); g.lineWidth = 1; g.strokeStyle = CONTORNO; g.stroke();
+    g.fillStyle = v12Mat === 'madeira' ? '#b98a52' : '#a9adb3'; g.fill(); g.lineWidth = 1; g.strokeStyle = CONTORNO; g.stroke();
     g.beginPath(); g.moveTo(f.x0 + ux * 2, f.y0 + uy * 2); g.lineTo(f.x1 - ux * 2, f.y1 - uy * 2); g.lineWidth = 0.6; g.strokeStyle = '#ffffff'; g.stroke();
+  } else if (f.tipo === 'lanca') { v12DesenharLanca(g, f, ux, uy, px, py);
   } else if (f.tipo === 'arco') {
     const lx = f.l.x, ly = f.l.y, R = 7.5;
     const a = { x: f.x0 + lx * R - ux * 1.5, y: f.y0 + ly * R - uy * 1.5 }, b = { x: f.x0 - lx * R - ux * 1.5, y: f.y0 - ly * R - uy * 1.5 };
@@ -4464,6 +4472,7 @@ function desenharEscudo(g, x, y, r) {
   circulo(g, x, y, r * 0.3); g.fillStyle = '#c9cdd1'; g.fill(); g.lineWidth = 0.8; g.strokeStyle = CONTORNO; g.stroke();
 }
 function desenharEscudoNoColono(g, p, maos, lx, ly, fx, fy) {
+  if (p.v12) return v12Escudo(g, p, lx, ly, fx, fy);
   const bl = p.bloqueio || 0, m = maos[0];
   const x = lerp(m.x - lx * 1.5, fx * 7, bl), y = lerp(m.y - 1, 3 + fy * 7, bl);
   desenharEscudo(g, x, y, 5.2 + bl * 1.2);
@@ -5050,7 +5059,7 @@ function destruirParte(c, id, tipo, origem) {
   st10('partesPerdidas');
   const sub = tudo.length > 1 ? ` (junto: ${tudo.slice(1).filter(k => A.partes[k].prof === 'fora').map(k => A.partes[k].nome.toLowerCase()).slice(0, 4).join(', ')}${tudo.length > 5 ? '…' : ''})` : '';
   if (!c.animal || inspecaoAnimal(c)) log(`${c.nome} ${P.prof === 'dentro' ? 'teve destruído(a)' : 'perdeu'}: ${P.nome.toLowerCase()}${sub}${origem ? ' — ' + origem : ''}!`, 'ruim');
-  if (!c.animal) { respingo(c.x, c.y, 1.4); if (P.g === 'mao' || P.g === 'braco') { const cp = capacidades(c); if (cp.manipulacao < 0.12 && c.arma) { largarItem(Math.round(c.x), Math.round(c.y), c.arma.toUpperCase(), 1); log(`${c.nome} não consegue mais segurar a arma.`); c.arma = null; } } }
+  if (!c.animal) { respingo(c.x, c.y, 1.4); if (P.g === 'mao' || P.g === 'braco') { const cp = capacidades(c); if (cp.manipulacao < 0.12 && c.arma) { largarItem(Math.round(c.x), Math.round(c.y), armaItem12(c), 1); log(`${c.nome} não consegue mais segurar a arma.`); c.arma = null; } } }
   s.cap = null;
   if (P.vital) return morrer(c, `${P.nome} destruído(a)`);
   recalcularSaude(c);
@@ -5146,13 +5155,13 @@ function atualizarSaude(c, horas) {
     // infecção: um sorteio por ferida depois de 3 h; cuidado bom (e ferida limpa) reduz a chance
     if (!f.infRolou && f.idade > 180 && BASE_INFEC(f) > 0) {
       f.infRolou = true;
-      const p = BASE_INFEC(f) * (f.trat ? (1 - f.trat) * 0.75 + 0.05 : 1) * (f.limpo ? 0.45 : 1) * (c.animal ? 0.3 : 1);
+      const p = BASE_INFEC(f) * (f.trat ? (1 - f.trat) * 0.3 + 0.02 : 1) * (f.limpo ? 0.3 : 1) * (f.ervas ? 0.25 : 1) * (c.animal ? 0.3 : 1); // v12: tratar/limpar previne quase todas
       if (rnd() < p) { f.infec = 0.04; f.imune = 0; st10('infeccoes'); if (!c.animal) log(`A ferida (${anatDe(c).partes[f.parte].nome.toLowerCase()}) de ${c.nome} infeccionou!`, 'ruim'); }
     }
     if (f.infec > 0) { // corrida: infecção (piora ~0,84/dia sem tratar) contra imunidade (~0,64/dia)
-      const tq = f.infTrat && agora() - f.infT < 720 ? f.infTrat : 0;
+      const tq = f.infTrat && agora() - f.infT < 900 ? f.infTrat * (f.ervas ? 1.25 : 1) : 0;
       if (!f.immK) f.immK = 0.88 + rnd() * 0.42; // cada corpo reage diferente
-      f.infec = clamp(f.infec + horas * (0.03 - 0.028 * tq), 0, 1);
+      f.infec = clamp(f.infec + horas * (0.019 - 0.03 * tq), 0, 1); // v12: progride mais devagar (~0,46/dia sem tratar)
       f.imune = clamp(f.imune + horas * 0.0325 * f.immK * (camaReal ? 1.2 : repouso ? 1.1 : 1) * (c.fome !== undefined && c.fome < 20 ? 0.75 : 1), 0, 1);
       if (f.imune >= 1) { f.infec = 0; f.infCurada = true; f.infTrat = 0; st10('infeccoesCuradas'); if (!c.animal) log(`${c.nome} ganhou a corrida contra a infecção (imunidade completa).`, 'bom'); }
       else if (f.infec >= 1) { st10('mortesInfeccao'); return morrer(c, 'infecção'); }
@@ -5164,6 +5173,7 @@ function atualizarSaude(c, horas) {
     let taxa = (0.12 + 0.7 * q) * (camaReal ? 1.4 : repouso ? 1.2 : 1);
     if (f.tipo === 'fratura') taxa *= f.tala ? 0.35 : 0; // sem tala o osso não cola if (f.tipo === 'trinca') taxa *= 0.5;
     if (f.infec > 0.25) taxa *= 0.3;
+    if (f.ervas) taxa *= 1.5; // v12: remédio de ervas acelera a cura
     const d0 = f.dano; f.dano = Math.max(0, f.dano - taxa * horas);
     if (f.dano !== d0) { atualizarSev(c, f); mudou = true; }
   }
@@ -5214,8 +5224,8 @@ function escolherTratamento(p, f, temBand) {
   if (pacienteNaCama(p) && f.tipo === 'contusao') return 'tratarNaCama';
   return GRUPO_TRAT[g];
 }
-const REMEDIO = { boa: { nome: 'bandagem boa', q: 0.95 }, simples: { nome: 'bandagem simples', q: 0.72 }, nenhum: { nome: 'sem remédio', q: 0.42 } };
-const remedioDe = m => (m.bandBoas || 0) > 0 ? 'boa' : (m.bandagens || 0) > 0 ? 'simples' : 'nenhum';
+const REMEDIO = { ervas: { nome: 'remédio de ervas', q: 1.0 }, boa: { nome: 'bandagem boa', q: 0.95 }, simples: { nome: 'bandagem simples', q: 0.72 }, nenhum: { nome: 'sem remédio', q: 0.42 } };
+const remedioDe = m => (m.remedios12 || 0) > 0 ? 'ervas' : (m.bandBoas || 0) > 0 ? 'boa' : (m.bandagens || 0) > 0 ? 'simples' : 'nenhum';
 function habMed(m) { if (m.habMed === undefined) m.habMed = 3 + Math.floor(rnd() * 5) + (m.prioridades && m.prioridades.medico === 1 ? 2 : 0); return m.habMed; }
 function qualidadeTrat(m, med) { return clamp(REMEDIO[med].q * (0.55 + 0.045 * habMed(m)) + (rnd() - 0.5) * 0.16, 0.08, 1); }
 function ganharXpMed(m, n = 1) {
@@ -5229,7 +5239,7 @@ function aplicarTratamento(m, p, f, an) {
   if (!f) return;
   const usaBand = an.startsWith('bandagem') || an.startsWith('tala') || an === 'tratarInfeccao';
   const med = usaBand ? remedioDe(m) : 'nenhum', q = qualidadeTrat(m, med);
-  if (usaBand && med === 'boa') { m.bandBoas--; st10('bandagensBoasUsadas'); st10('bandagensUsadas'); } else if (usaBand && med === 'simples') { m.bandagens--; st10('bandagensUsadas'); }
+  if (usaBand && med === 'ervas') { m.remedios12--; st10('remediosErvas'); f.ervas = true; } else if (usaBand && med === 'boa') { m.bandBoas--; st10('bandagensBoasUsadas'); st10('bandagensUsadas'); } else if (usaBand && med === 'simples') { m.bandagens--; st10('bandagensUsadas'); }
   if (an === 'pressionar') { f.pressionado = true; f.sangra = Math.min(f.sangra, f.sangra * 0.3, 7); }
   else if (an === 'limpar') { f.limpo = true; f.sangra *= 0.7; }
   else if (an === 'tratarInfeccao') { f.infTrat = q; f.infT = agora(); st10('infeccoesTratadas'); }
@@ -5249,7 +5259,7 @@ function atualizarAnimalSaude(a, cai) {
   if (cai && !s.caido) { s.caido = true; a.estado = 'caido'; a.caminho = []; a.vel = 0; a.atk = 0; st10('animaisCaidos'); log(`O(a) ${E.nome.toLowerCase()} caiu ferido(a) e não consegue fugir.`, 'bom'); }
   else if (!cai && s.caido && k.movimento > 0.25 && s.dor < 0.7) { s.caido = false; a.estado = 'vagar'; a.pensar = 1; }
 }
-const fatorMovAnimal = a => a.saude ? clamp(capDe(a).movimento * (1 - 0.25 * a.saude.dor), 0.12, 1) : 1;
+let fatorMovAnimal = a => a.saude ? clamp(capDe(a).movimento * (1 - 0.25 * a.saude.dor), 0.12, 1) : 1;
 function pernaMancaAnimal(a) { // perna mais machucada (0..3) e quanto manca
   if (!a.saude || !a.saude.feridas.length && !a.saude.perdidas.length) return null;
   let m = null, mv = 0.12;
@@ -6361,7 +6371,7 @@ function v11EscolherAlvo(c, atual) {
 function v11InimigoPerto(c) { let m = null, md = 1e9; for (const e of v11InimigosDe(c)) { const d = Math.hypot(e.x - c.x, e.y - c.y); if (d < md) { md = d; m = e; } } return m; }
 function v11Panico(c, base, motivo) {
   if (c.panico11 > agora() || saude(c).caido || saude(c).morto) return false;
-  let ch = base * (1.35 - (c.humor ?? 60) / 100) * (1 + (saude(c).dor || 0)) * (c.escudoPesado ? 0.55 : 1) * (c.bandido ? 1.25 : 1) * (c.form11 && V11.forms[c.form11] && V11.forms[c.form11].modo === 'quadrado' ? 0.6 : 1);
+  let ch = base * (1.35 - (c.humor ?? 60) / 100) * (1 + (saude(c).dor || 0)) * (c.escudoPesado ? 0.55 : 1) * (c.bandido ? 1.25 : 1) * (c.form11 && V11.forms[c.form11] && V11.forms[c.form11].modo === 'quadrado' ? 0.25 : 1); // v12: o quadrado é disciplinado (0,6 → 0,25)
   if (V11.forcarPanico) ch = 1;
   if (rnd() >= ch) return false;
   c.panico11 = agora() + 20; st11('panicos');
@@ -6406,8 +6416,8 @@ function v11Formar(lado, dt) {
     const arqIni = alvoL.filter(e => e.arma === 'arco' && e.flechas > 0).length;
     let lados = 0; { const s = new Set(); for (const e of alvoL) s.add(Math.round(Math.atan2(e.y - F.ay, e.x - F.ax) / (Math.PI / 2))); lados = s.size; }
     const o = lado === 'c' ? V11.ordem : {};
-    const querQuad = escudos >= 3 && (arqIni >= 2 || F.flechas.length >= 3 || feridosFora.length > 0 || lados >= 3);
-    const modo = o.modo || (querQuad ? 'quadrado' : 'linha');
+    const querQuad = v12PodeQuadrado(m) && (arqIni >= 2 || F.flechas.length >= 3 || feridosFora.length > 0 || lados >= 3);
+    const modo = (o.modo === 'quadrado' && !v12PodeQuadrado(m) ? 'linha' : o.modo) || (querQuad ? 'quadrado' : 'linha'); // v12: só com 12 na parede + 4 no teto
     if (modo !== F.modo) { F.modo = modo; F.kForm = 0; st11('modo_' + modo); log(`${lado === 'c' ? 'Colonos' : 'Bandidos'}: ${modo === 'quadrado' ? 'formar quadrado!' : 'formar linha!'}`); }
     const teto = o.teto ?? (F.modo === 'quadrado' && (F.flechas.length >= 2 || arqIni >= 2));
     if (teto !== F.teto) { F.teto = teto; if (teto) { st11('teto'); log(`${lado === 'c' ? 'Colonos' : 'Bandidos'} erguem o teto de escudos!`); } }
@@ -6499,7 +6509,7 @@ function v11Lutar(c, t, dt) {
     v11Decidir(c, t);
   }
   const a = t.presa; if (!v11Valido(a)) return false;
-  const arco = c.arma === 'arco' && c.flechas > 0, alc = arco ? (c.arcoLongo ? 10 : 7.5) : (a.saude && a.saude.caido ? 2.1 : 1.9);
+  const arco = c.arma === 'arco' && c.flechas > 0, alc = arco ? (c.arcoLongo ? 10 : 7.5) : alcMelee12(c, a);
   const d = Math.hypot(a.x - c.x, a.y - c.y);
   switch (c.acao11) {
     case 'recuar': fim(c); st11('recuos'); log(`${c.nome} está ferido(a) e recua da ${c.form11 ? 'formação' : 'luta'}.`, 'ruim'); c.guarda11 = 0; if (c.bandido) v11BandidoParte(c); else iniciarFuga(c, a); return true;
@@ -6620,8 +6630,8 @@ function v11Overlay(g, k) {
     }
     if (F.kTeto > 0.02 && F.modo === 'quadrado' && F.R) { // teto de escudos: placas de madeira sobrepostas que sobem
       const R = F.R + 0.35, lift = (1 - F.kTeto) * z * 0.8;
-      g.globalAlpha = 0.5 * F.kTeto;
-      for (let i = -F.R; i <= F.R; i++) for (let j = -F.R; j <= F.R; j++) {
+      g.globalAlpha = 0.22 * F.kTeto; const RT = Math.max(1, F.R - 1); // v12: o teto cobre só o miolo (os sprites erguem o escudo de verdade)
+      for (let i = -RT; i <= RT; i++) for (let j = -RT; j <= RT; j++) {
         const p = S(F.ax + F.ux * i * 0.95 + F.px * j * 0.95, F.ay + F.uy * i * 0.95 + F.py * j * 0.95), w = Math.sin(tempoReal * 2 + i + j) * z * 0.02;
         g.beginPath(); g.ellipse(p.x, p.y - z * 0.75 + lift + w, z * 0.44, z * 0.3, 0, 0, 7); g.fillStyle = (i + j) & 1 ? '#a8763f' : '#946632'; g.fill();
         g.lineWidth = 1.5 * k; g.strokeStyle = '#3a2410'; g.stroke(); g.beginPath(); g.arc(p.x, p.y - z * 0.75 + lift + w, z * 0.09, 0, 7); g.fillStyle = '#c9c0a8'; g.fill();
@@ -6679,7 +6689,7 @@ function v11Ordem(k) {
   const _morrer = morrer; morrer = function (c, causa) {
     if (c.bandido) {
       const s = saude(c); if (s.morto) return; s.morto = true; s.causa = causa; s.caido = true;
-      if (c.arma) largarItem(Math.round(c.x), Math.round(c.y), c.arma === 'arco' ? (c.arcoLongo ? 'ARCO_LONGO' : 'ARCO') : 'ESPADA', 1);
+      if (c.arma) largarItem(Math.round(c.x), Math.round(c.y), armaItem12(c), 1);
       if (c.escudo) largarItem(Math.round(c.x), Math.round(c.y), c.escudoPesado ? 'ESCUDO_PESADO' : 'ESCUDO', 1);
       removerVisitante(c); log(`☠ ${c.nome} morreu (${causa}).`, 'bom'); st11('bandidosMortos'); v11Choque(c, 12, 0.4, 'um comparsa morreu'); return;
     }
@@ -6704,7 +6714,7 @@ function v11Ordem(k) {
   const _eq = equipar; equipar = function (c, it) {
     const tp = it.tipo, X = Math.round(c.x), Y = Math.round(c.y);
     if (tp === 'ESCUDO_PESADO') { if (c.arma === 'arco') { it.reservado = null; return; } if (c.escudo) largarItem(X, Y, c.escudoPesado ? 'ESCUDO_PESADO' : 'ESCUDO', 1); c.escudo = true; c.escudoPesado = true; removerItem(it); log(`${c.nome} equipou o escudo pesado.`); return; }
-    if (tp === 'ARCO_LONGO') { if (c.arma) largarItem(X, Y, c.arma === 'arco' && c.arcoLongo ? 'ARCO_LONGO' : c.arma.toUpperCase(), 1); if (c.escudo) { largarItem(X, Y, c.escudoPesado ? 'ESCUDO_PESADO' : 'ESCUDO', 1); c.escudo = false; c.escudoPesado = false; } c.arma = 'arco'; c.arcoLongo = true; removerItem(it); log(`${c.nome} equipou o arco longo.`); return; }
+    if (tp === 'ARCO_LONGO') { if (c.arma) largarItem(X, Y, c.arma === 'arco' && c.arcoLongo ? 'ARCO_LONGO' : armaItem12(c), 1); if (c.escudo) { largarItem(X, Y, c.escudoPesado ? 'ESCUDO_PESADO' : 'ESCUDO', 1); c.escudo = false; c.escudoPesado = false; } c.arma = 'arco'; c.arcoLongo = true; removerItem(it); log(`${c.nome} equipou o arco longo.`); return; }
     if ((tp === 'ESPADA' || tp === 'ARCO') && c.arcoLongo) { largarItem(X, Y, 'ARCO_LONGO', 1); c.arma = null; c.arcoLongo = false; }
     if (tp === 'ESPADA' || tp === 'ARCO') { const pes = c.escudoPesado; const r = _eq(c, it); if (!c.escudo && pes) { c.escudoPesado = false; /* o original largou 'ESCUDO': troca pelo pesado */ const q = itens.find(i => i.tipo === 'ESCUDO' && i.x === X && i.y === Y); if (q) q.tipo = 'ESCUDO_PESADO'; } return r; }
     return _eq(c, it);
@@ -6723,6 +6733,389 @@ for (const [tam, n] of [['pequeno', 'pequeno (escudo, arqueiro, espada)'], ['med
 addDev({ id: 'v11_panico', cat: 'Combate v11', nome: 'Forçar pânico no colono (clique)', mapa: (p) => colonoAlvo(p.x, p.y, c => { V11.forcarPanico = true; v11Panico(c, 1, 'dev'); V11.forcarPanico = false; }, 'pânico') ? 1 : 0 });
 addDev({ id: 'v11_pesado', cat: 'Combate v11', nome: 'Equipar escudo pesado + espada (clique)', mapa: (p) => colonoAlvo(p.x, p.y, c => { c.arma = 'espada'; c.arcoLongo = false; c.escudo = true; c.escudoPesado = true; }, 'escudo pesado') ? 1 : 0 });
 addDev({ id: 'v11_longo', cat: 'Combate v11', nome: 'Equipar arco longo + 20 flechas (clique)', mapa: (p) => colonoAlvo(p.x, p.y, c => { c.arma = 'arco'; c.arcoLongo = true; c.escudo = false; c.escudoPesado = false; c.flechas = 20; }, 'arco longo') ? 1 : 0 });
+
+/* =====================================================================
+   v12 — LANÇAS e materiais (madeira/pedra), alcance 2 tiles, linha de visão
+   dos arqueiros por cima de aliados e cobertura baixa, paliçada e estacas,
+   ervas medicinais e remédio de ervas, animação real do escudo, quadrado de 16.
+   ===================================================================== */
+let v12Mat = 'pedra';
+const st12 = (k, n = 1) => { const s = estado.stats.v12 || (estado.stats.v12 = {}); s[k] = (s[k] || 0) + n; };
+ARMAS.espada.nome = 'Espada'; ARMAS.lanca.nome = 'Lança';
+ITEM.ESPADA_MADEIRA = { nome: 'Espada de madeira', max: 1, equip: 'arma' };
+ITEM.LANCA = { nome: 'Lança de pedra', max: 1, equip: 'arma' };
+ITEM.LANCA_MADEIRA = { nome: 'Lança de madeira', max: 1, equip: 'arma' };
+ITEM.ERVAS = { nome: 'Ervas medicinais', max: 30 };
+ITEM.REMEDIO_ERVAS = { nome: 'Remédio de ervas', max: 10 };
+RECEITAS.ESPADA_MADEIRA = { nome: 'Espada de madeira', custo: { MADEIRA: 6 }, tempo: 80 };
+RECEITAS.LANCA_MADEIRA = { nome: 'Lança de madeira (alcance 2)', custo: { MADEIRA: 7 }, tempo: 80 };
+RECEITAS.LANCA = { nome: 'Lança de pedra (alcance 2)', custo: { MADEIRA: 5, PEDRA: 4 }, tempo: 130 };
+RECEITAS.REMEDIO_ERVAS = { nome: 'Remédio de ervas (x2)', custo: { ERVAS: 3 }, tempo: 50, saida: { REMEDIO_ERVAS: 2 } };
+// estatísticas por arma e material
+const ARMA12 = { espada: { alc: 1.9, dano: { madeira: 9, pedra: 15 }, sobreMuro: false }, lanca: { alc: 2.9, dano: { madeira: 8.5, pedra: 13.5 }, sobreMuro: true } };
+DANO_ANIM.lanca = 13.5; TIPO_GOLPE.lanca = 'perfuracao';
+ACOES.lanca = { ritmo: 1.0, golpes: [0.5] };
+function armaItem12(c) {
+  if (c.arma === 'arco') return c.arcoLongo ? 'ARCO_LONGO' : 'ARCO';
+  if (c.arma === 'espada') return c.mat12 === 'madeira' ? 'ESPADA_MADEIRA' : 'ESPADA';
+  if (c.arma === 'lanca') return c.mat12 === 'madeira' ? 'LANCA_MADEIRA' : 'LANCA';
+  return (c.arma || 'ESPADA').toUpperCase();
+}
+const ITEM_ARMA12 = { ESPADA: ['espada', 'pedra'], ESPADA_MADEIRA: ['espada', 'madeira'], LANCA: ['lanca', 'pedra'], LANCA_MADEIRA: ['lanca', 'madeira'] };
+const muroEstr12 = e => e === ESTR.PAREDE_MADEIRA || e === ESTR.PAREDE_PEDRA || e === ESTR.PALICADA;
+function barreira12(c, a) { // há muro/paliçada entre os dois (sem contar os tiles deles)?
+  const d = Math.hypot(a.x - c.x, a.y - c.y), n = Math.max(2, Math.ceil(d * 3)), t0 = idx(Math.round(c.x), Math.round(c.y)), t1 = idx(Math.round(a.x), Math.round(a.y));
+  for (let k = 1; k < n; k++) { const x = Math.round(lerp(c.x, a.x, k / n)), y = Math.round(lerp(c.y, a.y, k / n)); if (!dentro(x, y)) continue; const i = idx(x, y); if (i === t0 || i === t1) continue; if (muroEstr12(mapa.estrutura[i])) return true; }
+  return false;
+}
+function alcMelee12(c, a) {
+  const A = ARMA12[c.arma], base = A ? A.alc : 1.9, extra = a && a.saude && a.saude.caido ? 0.2 : 0;
+  if (a && (!A || !A.sobreMuro) && barreira12(c, a)) return 0.3; // espada/punho não passa por cima do muro
+  return base + extra;
+}
+// LOS do arqueiro: aliados e cobertura baixa (rocha, paliçada) não bloqueiam; árvores e paredes cheias atrapalham em parte
+function losPen12(c, a) {
+  const d = Math.hypot(a.x - c.x, a.y - c.y), n = Math.ceil(d * 2), t1 = idx(Math.round(a.x), Math.round(a.y)); let pen = 0; const vistos = new Set();
+  for (let k = 1; k < n; k++) { const x = Math.round(lerp(c.x, a.x, k / n)), y = Math.round(lerp(c.y, a.y, k / n)); if (!dentro(x, y)) continue; const i = idx(x, y); if (i === t1 || vistos.has(i)) continue; vistos.add(i);
+    const e = mapa.estrutura[i];
+    if (e === ESTR.PAREDE_MADEIRA || e === ESTR.PAREDE_PEDRA) pen += Math.hypot(x - c.x, y - c.y) < 1.6 ? 0.15 : 0.55; // parede cheia: atrapalha (encostado nela dá para atirar por cima)
+    else if (mapa.arvore[i] && mapa.arvore[i] !== ARBUSTO) pen += 0.35;
+    else if (mapa.terreno[i] === TERRENO.ROCHA || e === ESTR.PALICADA) pen += 0.04; }
+  return pen;
+}
+{
+  const _los = linhaDeVisao; linhaDeVisao = function (c, a) { if (c.arma !== 'arco') return _los(c, a); const p = losPen12(c, a); c.losPen12 = p; return p < 1; };
+  const _ga = golpearAnimal; golpearAnimal = function (c, a, tp) {
+    if (tp === 'arco') { const n0 = projeteis.length; const r = _ga(c, a, tp); const q = projeteis[projeteis.length - 1]; if (projeteis.length > n0 && q && q.acerta) { const p = losPen12(c, a); if (p > 0.05 && rnd() < p * 0.6) { q.acerta = false; q.x1 += (rnd() - 0.5) * 2; q.y1 += (rnd() - 0.5) * 2; st12('flechaDesviada'); } else st12('flechaPorCima'); } return r; }
+    const A = ARMA12[tp], d0 = DANO_ANIM[tp];
+    if (A) { if (!A.sobreMuro && barreira12(c, a)) return; DANO_ANIM[tp] = A.dano[c.mat12 === 'madeira' ? 'madeira' : 'pedra']; if (tp === 'lanca') st12(barreira12(c, a) ? 'lancaSobreMuro' : 'golpesLanca'); }
+    try { return _ga(c, a, tp); } finally { DANO_ANIM[tp] = d0; }
+  };
+  const _gan = golpeAnimal; golpeAnimal = function (a, c) { if (barreira12(a, c)) { st12('muroSegurou'); return; } return _gan(a, c); };
+  const _eq = equipar; equipar = function (c, it) {
+    const w = ITEM_ARMA12[it.tipo];
+    if (w) { const X = Math.round(c.x), Y = Math.round(c.y); if (c.arma) largarItem(X, Y, armaItem12(c), 1); c.arma = w[0]; c.mat12 = w[1]; c.arcoLongo = false; removerItem(it); log(`${c.nome} equipou ${ITEM[it.tipo].nome.toLowerCase()}.`); return; }
+    if (it.tipo === 'REMEDIO_ERVAS') { const q = Math.min(4 - (c.remedios12 || 0), it.qtd); c.remedios12 = (c.remedios12 || 0) + q; it.qtd -= q; it.reservado = null; if (it.qtd <= 0) removerItem(it); log(`${c.nome} pegou remédio de ervas.`); return; }
+    const r = _eq(c, it); if (c.arma !== 'espada' && c.arma !== 'lanca') c.mat12 = undefined; return r;
+  };
+  const _te = tentarEquipar; tentarEquipar = function (c) {
+    const busca = (tipos, cond) => { if (!cond) return false; for (const tp of tipos) { const cs = itens.filter(it => it.tipo === tp && !it.reservado).map(it => ({ x: it.x, y: it.y, adj: false, item: it })); if (!cs.length) continue; const r = melhorAlvo(c, cs, 2); if (!r || r.caminho.length > 60) continue; r.alvo.item.reservado = c; c.tarefa = { tipo: 'pegar', fase: 'indo', item: r.alvo.item }; c.caminho = r.caminho; return true; } return false; };
+    const caca = c.prioridades.caca && c.prioridades.caca <= 2;
+    if (!c.arma && !(caca && itens.some(i => i.tipo === 'ARCO'))) { if (busca(c.escudo ? ['LANCA', 'ESPADA', 'LANCA_MADEIRA', 'ESPADA_MADEIRA'] : ['ESPADA', 'LANCA', 'ESPADA_MADEIRA', 'LANCA_MADEIRA'], true)) return true; }
+    if ((c.arma === 'espada' || c.arma === 'lanca') && c.mat12 === 'madeira' && busca([c.arma === 'espada' ? 'ESPADA' : 'LANCA'], true)) return true;
+    if (busca(['REMEDIO_ERVAS'], c.prioridades.medico && (c.remedios12 || 0) < 2)) return true;
+    return _te(c);
+  };
+  const _te2 = textoEquip; textoEquip = function (c) { let s = _te2(c); if (c.arma === 'espada' || c.arma === 'lanca') s = s.replace(ARMAS[c.arma].nome, ITEM[armaItem12(c)].nome); if (c.remedios12) s += `, ${c.remedios12} remédio(s) de ervas`; return s; };
+  // pedidos automáticos: armas que faltam (com o material que houver) e coleta de madeira/pedra para elas
+  const _ap = autoPedidos; autoPedidos = function () {
+    _ap(); if (!mapa.bancadas.length) return;
+    const est = estoque(), fila = estado.pedidos, q = k => fila.filter(p => p === k).length + mapa.bancadas.filter(b => b.fazendo === k).length;
+    const armasNoChao = itens.filter(i => ITEM_ARMA12[i.tipo] && !i.reservado).length;
+    const semArma = colonos.filter(c => !c.arma && !saude(c).caido).length, emFila = ['ESPADA', 'ESPADA_MADEIRA', 'LANCA', 'LANCA_MADEIRA'].reduce((s, k) => s + q(k), 0);
+    const madeira = c => colonos.filter(o => (o.arma === 'espada' || o.arma === 'lanca') && o.mat12 === 'madeira').length;
+    let precisa = semArma - armasNoChao - emFila; const tot = t => itens.reduce((n, it) => n + (it.tipo === t && !it.reservado ? it.qtd : 0), 0), M = tot('MADEIRA'), P = tot('PEDRA');
+    const lancas = colonos.filter(c => c.arma === 'lanca').length + q('LANCA') + q('LANCA_MADEIRA'), espadas = colonos.filter(c => c.arma === 'espada').length + q('ESPADA') + q('ESPADA_MADEIRA');
+    if (precisa > 0) {
+      const querLanca = lancas <= espadas;
+      if (P >= 6 && M >= 5) fila.push(querLanca ? 'LANCA' : 'ESPADA');
+      else if (M >= 7) fila.push(querLanca ? 'LANCA_MADEIRA' : 'ESPADA_MADEIRA');
+      else v12Coletar(M < 7 ? 'cortar' : 'minerar');
+      if (fila.length && ITEM_ARMA12[fila[fila.length - 1]]) { st12('pedidoArma'); log(`Pedido automático: ${RECEITAS[fila[fila.length - 1]].nome.toLowerCase()} (há colono sem arma).`); }
+      if (P < 6) v12Coletar('minerar');
+    } else if (madeira() > 0 && emFila === 0 && P >= 10 && M >= 10 && !itens.some(i => i.tipo === 'ESPADA' || i.tipo === 'LANCA')) { const o = colonos.find(o => o.mat12 === 'madeira'); fila.push(o.arma === 'lanca' ? 'LANCA' : 'ESPADA'); st12('pedidoUpgrade'); }
+    if ((est.ERVAS || 0) >= 3 && q('REMEDIO_ERVAS') === 0 && (est.REMEDIO_ERVAS || 0) + colonos.reduce((s, c) => s + (c.remedios12 || 0), 0) < 4) { fila.push('REMEDIO_ERVAS'); log('Pedido automático: remédio de ervas.'); }
+    // a fila não trava: o primeiro pedido possível vai para a frente
+    if (fila.length > 1 && !temMateriais(RECEITAS[fila[0]].custo)) { const k = fila.findIndex(p => temMateriais(RECEITAS[p].custo)); if (k > 0) fila.unshift(fila.splice(k, 1)[0]); }
+  };
+}
+function v12Coletar(tipo) { // marca 3 árvores/rochas perto da bancada se não houver nada marcado
+  if ([...mapa.desig.values()].filter(d => d.tipo === tipo).length >= 2) return;
+  const b = mapa.bancadas[0]; if (!b) return; const l = [];
+  for (let y = Math.max(0, b.y - 25); y < Math.min(mapa.A, b.y + 25); y++) for (let x = Math.max(0, b.x - 25); x < Math.min(mapa.L, b.x + 25); x++) { const i = idx(x, y); if (mapa.desig.has(i)) continue; if (tipo === 'cortar' ? mapa.arvore[i] && mapa.arvore[i] !== ARBUSTO : mapa.terreno[i] === TERRENO.ROCHA) l.push({ x, y, i, d: Math.hypot(x - b.x, y - b.y) }); }
+  l.sort((p, q) => p.d - q.d); for (const o of l.slice(0, 3)) mapa.desig.set(o.i, { tipo, x: o.x, y: o.y });
+  if (l.length) { st12(tipo === 'cortar' ? 'autoCorte' : 'autoMinerar'); log(`Para as armas: ${tipo === 'cortar' ? 'árvores marcadas para corte' : 'rochas marcadas para mineração'}.`); }
+}
+/* ---------- ervas medicinais (planta silvestre) ---------- */
+function v12GerarErvas() {
+  mapa.ervas12 = new Map(); const r = mulberry32((mapa.seed * 7919 + 13) | 0); let n = 0, tent = 0;
+  while (n < 26 && tent++ < 4000) { const x = 2 + Math.floor(r() * (mapa.L - 4)), y = 2 + Math.floor(r() * (mapa.A - 4)), i = idx(x, y);
+    if (!chaoFirme(x, y) || mapa.arvore[i] || mapa.estrutura[i] || mapa.ervas12.has(i) || Math.hypot(x - mapa.L / 2, y - mapa.A / 2) < 5) continue;
+    mapa.ervas12.set(i, { x, y, pronta: 1, rebrota: 0 }); n++; }
+}
+{
+  const _nj = novoJogo; novoJogo = function (seed) { _nj(seed); v12GerarErvas(); V12.anim = {}; };
+  const _ser = serializar; serializar = function () { const d = _ser(); d.mapa.ervas12 = [...(mapa.ervas12 || new Map()).values()]; return d; };
+  const _as = aplicarSave; aplicarSave = function (d) { _as(d); if (d.mapa && d.mapa.ervas12) mapa.ervas12 = new Map(d.mapa.ervas12.map(o => [idx(o.x, o.y), o])); else if (!mapa.ervas12) v12GerarErvas(); for (const c of colonos) { if ((c.arma === 'espada' || c.arma === 'lanca') && !c.mat12) c.mat12 = 'pedra'; c.remedios12 = c.remedios12 || 0; } };
+  const _cv = candidatosV8; candidatosV8 = function (c, P, cands) {
+    _cv(c, P, cands);
+    if (P.coleta && mapa.ervas12 && !saude(c).caido) { const tem = (estoque().ERVAS || 0); if (tem < 12) for (const [i, e] of mapa.ervas12) if (e.pronta && !e.por) cands.coleta.push({ x: e.x, y: e.y, adj: false, i, v8: 'erva', e }); }
+  };
+  const _iv = iniciarV8; iniciarV8 = function (c, r) { const a = r.alvo; if (a.v8 === 'erva') { a.e.por = c; c.tarefa = { tipo: 'erva', e: a.e, i: a.i, alvo: { x: a.e.x, y: a.e.y }, fase: 'indo', progresso: 0, total: 25 }; c.caminho = r.caminho; return true; } return _iv(c, r); };
+  const _ex = executarV8; executarV8 = function (c, dt, min) {
+    const t = c.tarefa;
+    if (t && t.tipo === 'erva') {
+      const e = t.e; if (!e.pronta || e.por !== c) { e.por = e.por === c ? null : e.por; fim(c); return true; }
+      if (t.fase === 'indo') { if (!c.caminho.length) { t.fase = 'fazendo'; c.acaoF = 0; } return true; }
+      virarPara(c, e.x, e.y + 0.3); t.progresso += min * fatorTrab(c); c.acaoF = (c.acaoF + dt * 1.2) % 1;
+      if (t.progresso >= t.total) { e.pronta = 0; e.rebrota = agora() + 2 * 1440; e.por = null; largarItem(e.x, e.y, 'ERVAS', 2); st12('ervasColhidas', 2); log(`${c.nome} colheu ervas medicinais.`, 'bom'); fim(c); }
+      return true;
+    }
+    return _ex(c, dt, min);
+  };
+  const _ta = tipoAcaoV8; tipoAcaoV8 = function (c, t) { if (t.tipo === 'erva' && t.fase === 'fazendo') return 'colher'; return _ta(c, t); };
+  const _dt = descreverTarefaV8; descreverTarefaV8 = function (c, t) { if (t.tipo === 'erva') return t.fase === 'indo' ? 'Indo colher ervas medicinais.' : 'Colhendo ervas medicinais.'; return _dt(c, t); };
+  const _at = aplicarTratamento; aplicarTratamento = function (m, p, f, an) { const r = _at(m, p, f, an); if (f && an === 'limpar' && (m.remedios12 || 0) > 0) { m.remedios12--; f.ervas = true; st10('remediosErvas'); } return r; };
+}
+/* ---------- estacas: ferem e atrasam inimigos (saúde por partes) ---------- */
+function v12NaEstaca(a) { const x = Math.round(a.x), y = Math.round(a.y); return dentro(x, y) && mapa.estrutura[idx(x, y)] === ESTR.ESTACAS; }
+{
+  const _fa = fatorMovAnimal; fatorMovAnimal = function (a) { return _fa(a) * (v12NaEstaca(a) ? 0.45 : 1); };
+  const _ft = fatorMovTotal; fatorMovTotal = function (c) { return _ft(c) * (c.bandido && v12NaEstaca(c) ? 0.45 : 1); };
+}
+function v12Estacas(dt) {
+  for (const a of animais.concat(bandidos())) {
+    if (a.morto || (a.saude && (a.saude.morto)) || !v12NaEstaca(a)) continue;
+    const i = idx(Math.round(a.x), Math.round(a.y)); if (a.est12 === i && agora() - (a.est12t || 0) < 20) continue;
+    a.est12 = i; a.est12t = agora(); st12('estacasFeriram');
+    const parte = a.animal ? null : (rnd() < 0.5 ? 'pernaE' : 'pernaD');
+    if (a.animal) { visDe(a).golpe = 0.3; golpear(a, 'perfuracao', 7 + rnd() * 5, 'estacas', { alt: 'baixo' }); if (a.esp !== 'urso' && rnd() < 0.5 && a.estado === 'atacar') { a.estado = 'partir'; a.caminho = []; } }
+    else aplicarDano(a, parte, 'perfuracao', 6 + rnd() * 4, 'estacas');
+    if (rnd() < 0.25) log(`${a.nome} pisou nas estacas!`, 'bom');
+  }
+  if (mapa.ervas12) for (const e of mapa.ervas12.values()) if (!e.pronta && e.rebrota && agora() > e.rebrota) e.pronta = 1;
+}
+/* ---------- desenho: paliçada, estacas, ervas ---------- */
+function v12DesenharPalicada(g, x, y, planta) {
+  const X = x * T, Y = y * T; g.save(); if (planta) g.globalAlpha = 0.45;
+  const viz = (dx, dy) => dentro(x + dx, y + dy) && mapa.estrutura[idx(x + dx, y + dy)] === ESTR.PALICADA;
+  g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(X + 2, Y + T * 0.72, T - 2, 5);
+  for (let k = 0; k < 5; k++) { const px = X + 2 + k * (T - 4) / 4.4, h = T * 0.62 + ((k * 7 + x * 3 + y) % 4); g.beginPath(); g.moveTo(px, Y + T * 0.78); g.lineTo(px, Y + T * 0.78 - h + 4); g.lineTo(px + 2.6, Y + T * 0.78 - h); g.lineTo(px + 5.2, Y + T * 0.78 - h + 4); g.lineTo(px + 5.2, Y + T * 0.78); g.closePath(); g.fillStyle = k % 2 ? '#8a5a2c' : '#9b6a36'; g.fill(); g.lineWidth = 1; g.strokeStyle = CONTORNO; g.stroke(); }
+  g.fillStyle = '#5a3a1a'; g.fillRect(X, Y + T * 0.45, T, 2.2); if (viz(1, 0)) g.fillRect(X + T - 1, Y + T * 0.45, 2, 2.2);
+  g.restore();
+}
+function v12DesenharEstacas(g, x, y, planta) {
+  const X = x * T, Y = y * T; g.save(); if (planta) g.globalAlpha = 0.45;
+  for (let k = 0; k < 6; k++) { const px = X + 5 + (k % 3) * 9 + (k > 2 ? 4 : 0), py = Y + 12 + (k > 2 ? 10 : 0); g.beginPath(); g.moveTo(px - 2.5, py + 4); g.lineTo(px + 3, py - 7); g.lineTo(px + 2.5, py + 4); g.closePath(); g.fillStyle = '#a07040'; g.fill(); g.lineWidth = 0.9; g.strokeStyle = CONTORNO; g.stroke(); g.fillStyle = '#e0c89a'; g.fillRect(px + 2, py - 7, 1.4, 2); }
+  g.restore();
+}
+function v12DesenharErva(g, e) {
+  const X = e.x * T + T / 2, Y = e.y * T + T * 0.7; g.save();
+  for (let k = 0; k < 7; k++) { const a = -Math.PI / 2 + (k - 3) * 0.32, L = e.pronta ? 9 + (k % 2) * 3 : 4; g.beginPath(); g.moveTo(X, Y); g.quadraticCurveTo(X + Math.cos(a) * L * 0.6 + 2, Y + Math.sin(a) * L * 0.6, X + Math.cos(a) * L, Y + Math.sin(a) * L); g.lineWidth = 2.2; g.strokeStyle = e.pronta ? '#5aa04a' : '#7a8a50'; g.stroke(); }
+  if (e.pronta) for (const [dx, dy] of [[-4, -9], [3, -11], [6, -6]]) { circulo(g, X + dx, Y + dy, 1.8); g.fillStyle = '#e8e0ff'; g.fill(); circulo(g, X + dx, Y + dy, 0.7); g.fillStyle = '#d0a020'; g.fill(); }
+  g.restore();
+}
+{
+  const _dc = desenharEstruturasChao; desenharEstruturasChao = function (x0, y0, x1, y1) {
+    _dc(x0, y0, x1, y1);
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const i = idx(x, y), e = mapa.estrutura[i]; if (e === ESTR.ESTACAS) v12DesenharEstacas(ctx, x, y, false); else { const o = mapa.obra.get(i); if (o && o.tipo === 'estacas') v12DesenharEstacas(ctx, x, y, true); } }
+    if (mapa.ervas12) for (const e of mapa.ervas12.values()) if (e.x >= x0 && e.x <= x1 && e.y >= y0 && e.y <= y1) v12DesenharErva(ctx, e);
+  };
+  const _dl = desenharLinhaEstruturas; desenharLinhaEstruturas = function (y, x0, x1) {
+    _dl(y, x0, x1);
+    for (let x = x0; x <= x1; x++) { const i = idx(x, y); if (mapa.estrutura[i] === ESTR.PALICADA) v12DesenharPalicada(ctx, x, y, false); else { const o = mapa.obra.get(i); if (o && o.tipo === 'palicada') v12DesenharPalicada(ctx, x, y, true); } }
+  };
+  const _di = desenharItemV8; desenharItemV8 = function (g, it, cx, cy) {
+    const w = ITEM_ARMA12[it.tipo];
+    if (w) { v12Mat = w[1]; elipse(g, cx + 1, cy + 7, 12, 3); g.fillStyle = 'rgba(0,0,0,0.25)'; g.fill(); const d = { x: 15, y: -11 };
+      if (w[0] === 'espada') desenharArma(g, { tipo: 'espada', x0: cx - 7, y0: cy + 5, x1: cx + 8, y1: cy - 6, d }); else desenharArma(g, { tipo: 'lanca', x0: cx - 11, y0: cy + 7, x1: cx + 11, y1: cy - 8, d }); v12Mat = 'pedra'; return true; }
+    if (it.tipo === 'ERVAS') { v12DesenharErva(g, { x: (cx - T / 2) / T, y: (cy - T * 0.7 + 4) / T, pronta: 1 }); return true; }
+    if (it.tipo === 'REMEDIO_ERVAS') { elipse(g, cx, cy + 6, 8, 2.5); g.fillStyle = 'rgba(0,0,0,.25)'; g.fill(); g.beginPath(); g.ellipse(cx, cy + 1, 7, 5, 0, 0, 7); g.fillStyle = '#7a5a3a'; g.fill(); g.lineWidth = 1; g.strokeStyle = CONTORNO; g.stroke(); g.beginPath(); g.ellipse(cx, cy - 1.5, 5.5, 2.2, 0, 0, 7); g.fillStyle = '#6aa040'; g.fill(); return true; }
+    return _di(g, it, cx, cy);
+  };
+}
+function v12DesenharLanca(g, f, ux, uy, px, py) {
+  const L = Math.hypot(f.x1 - f.x0, f.y1 - f.y0), tx = f.x1, ty = f.y1, bx = f.x0 - ux * L * 0.35, by = f.y0 - uy * L * 0.35;
+  g.beginPath(); g.moveTo(bx, by); g.lineTo(tx - ux * 3, ty - uy * 3); g.lineWidth = 3; g.strokeStyle = CONTORNO; g.stroke(); g.lineWidth = 1.8; g.strokeStyle = '#8a6236'; g.stroke();
+  if (v12Mat === 'madeira') { g.beginPath(); g.moveTo(tx + ux * 1.5, ty + uy * 1.5); g.lineTo(tx - ux * 4 + px * 1.3, ty - uy * 4 + py * 1.3); g.lineTo(tx - ux * 4 - px * 1.3, ty - uy * 4 - py * 1.3); g.closePath(); g.fillStyle = '#4a2e14'; g.fill(); g.lineWidth = 0.8; g.strokeStyle = CONTORNO; g.stroke(); }
+  else { g.beginPath(); g.moveTo(tx + ux * 3, ty + uy * 3); g.lineTo(tx - ux * 3 + px * 2.4, ty - uy * 3 + py * 2.4); g.lineTo(tx - ux * 5, ty - uy * 5); g.lineTo(tx - ux * 3 - px * 2.4, ty - uy * 3 - py * 2.4); g.closePath(); g.fillStyle = '#8d9096'; g.fill(); g.lineWidth = 1; g.strokeStyle = CONTORNO; g.stroke(); g.beginPath(); g.moveTo(tx - ux * 4.5 - px * 1.6, ty - uy * 4.5 - py * 1.6); g.lineTo(tx - ux * 4.5 + px * 1.6, ty - uy * 4.5 + py * 1.6); g.lineWidth = 1.4; g.strokeStyle = '#c9b48a'; g.stroke(); }
+}
+// pose de estocada da lança: recolhe, estoca (alcance 2), volta
+POSES.lanca = (ac, b) => { const f = ac.f; const ext = f < 0.38 ? lerp(0, -3, suave(f / 0.38)) : f < 0.5 ? lerp(-3, 7, ((f - 0.38) / 0.12) ** 1.2) : lerp(7, 0, suave((f - 0.5) / 0.5));
+  const d = { x: b.fx, y: b.fy * 0.9 - 0.12 }, m1 = { x: b.lx * 2.5 + d.x * (6 + ext), y: 6 + b.ly * 2 + d.y * (6 + ext) }, m2 = { x: -b.lx * 1.5 + d.x * (1 + ext), y: 7 - b.ly * 1.5 + d.y * (1 + ext) };
+  return { maos: [P_(m2.x, m2.y, b.atras), P_(m1.x, m1.y, b.atras)], ferr: { tipo: 'lanca', x0: m1.x, y0: m1.y, x1: m1.x + d.x * 17, y1: m1.y + d.y * 17, d, atras: b.atras } }; };
+/* ---------- animação real do escudo (keyframes interpolados) ----------
+   kF: 0 = escudo ao lado · 1 = à frente do torso, firme, virado para o inimigo
+   kT: 0 = normal · 1 = acima da cabeça (teto) · rec: recuo ao receber golpe */
+const V12 = { anim: {}, forcarPose: null };
+const ease12 = t => t * t * (3 - 2 * t);
+function v12AlvoPose(c) {
+  const F = c.form11 && V11.forms[c.form11], luta = c.tarefa && c.tarefa.tipo === 'lutar';
+  let tF = c.escudo && (c.guarda11 > 0 || (luta && F) || (luta && !c.tarefa.job && c.tarefa.fase === 'fazendo')) ? 1 : 0;
+  let tT = c.escudo && F && F.teto && F.modo === 'quadrado' && c.dentro11 && c.papel11 !== 'arqueiro' ? 1 : 0;
+  if (tT) tF = 0;
+  return { tF, tT };
+}
+function v12EstadoEscudo(c) {
+  const A = V12.anim[c.nome + (c.bandido ? '#b' : '')] || (V12.anim[c.nome + (c.bandido ? '#b' : '')] = { kF: 0, kT: 0, t: tempoReal, rec: 0 });
+  const dt = clamp(tempoReal - A.t, 0, 0.1); A.t = tempoReal;
+  const alvo = V12.forcarPose ? V12.forcarPose(c) : v12AlvoPose(c);
+  const vF = 2.6, vT = 2.0; // ~0,4–0,5 s para erguer: vários quadros
+  A.kF = clamp(A.kF + Math.sign(alvo.tF - A.kF) * Math.min(Math.abs(alvo.tF - A.kF), dt * vF), 0, 1);
+  A.kT = clamp(A.kT + Math.sign(alvo.tT - A.kT) * Math.min(Math.abs(alvo.tT - A.kT), dt * vT), 0, 1);
+  const v = c.vis || {}; A.rec = Math.max(A.rec - dt * 3.5, (v.bloqueio || 0) > 0.3 ? 1 : 0, (v.golpe || 0) > 0.2 && c.escudo ? 0.7 : 0);
+  if (alvo.rec != null) A.rec = alvo.rec;
+  return { kF: ease12(A.kF), kT: ease12(A.kT), rec: A.rec, rawF: A.kF, rawT: A.kT };
+}
+{
+  const _ef = extrasFerido; extrasFerido = function (c) {
+    const ex = _ef(c); if (c.animal) return ex;
+    if (c.escudo || c.arma === 'espada' || c.arma === 'lanca') {
+      const S = c.escudo ? v12EstadoEscudo(c) : { kF: 0, kT: 0, rec: 0 };
+      ex.v12 = { ...S, arma: c.arma, mat: c.mat12 || 'pedra', escudo: !!c.escudo, pesado: !!c.escudoPesado };
+      if (c.escudo) { ex.escudo = true; ex.bloqueio = 0; }
+      const s = Math.sin(c.yawVis || 0);
+      ex.inclinaExtra = (ex.inclinaExtra || 0) + s * (0.11 * S.kF - 0.16 * S.rec) - 0.02 * S.kT; // inclina para frente apoiado no escudo; recua ao levar golpe
+      if (S.kF > 0.05 || S.kT > 0.05) ex.cabecaOff = { x: s * 1.2 * S.kF - s * S.rec * 1.5, y: 0.8 * S.kF + S.rec * 0.6 };
+    }
+    return ex;
+  };
+}
+function v12PosEscudo(P, lx, ly, fx, fy) {
+  const side = { x: -lx * 8.2, y: 7.5 - ly * 8 }, fr = { x: fx * (7.8 - 2.6 * P.rec) - lx * 1.2, y: 3.8 + fy * (7.8 - 2.6 * P.rec) }, top = { x: fx * 1.5, y: -19.5 };
+  const a = { x: lerp(side.x, fr.x, P.kF), y: lerp(side.y, fr.y, P.kF) - Math.sin(P.kF * Math.PI) * 2.5 }; // sobe em arco do lado para a frente
+  return { x: lerp(a.x, top.x, P.kT), y: lerp(a.y, top.y, P.kT) - Math.sin(P.kT * Math.PI) * 2 };
+}
+function v12EscAtras(p, co) { if (!p.v12) return co < -0.25; if (p.v12.kT > 0.5) return false; return co < -0.25; }
+function v12Maos(p, maos, b) {
+  const P = p.v12; if (!P.escudo) return maos;
+  const pos = v12PosEscudo(P, b.lx, b.ly, b.fx, b.fy), k = p.acao ? 1 : 0, out = maos.slice();
+  const mh = { x: pos.x + b.lx * 1.5 * (1 - P.kT), y: pos.y + 1.5 + P.kT * 2, atras: v12EscAtras(p, b.co) && P.kT < 0.5 };
+  out[k] = { ...out[k], ...mh };
+  if (!p.acao && P.kT > 0.05) { const o = 1 - k; out[o] = { x: lerp(out[o].x, -pos.x + b.lx * 3, P.kT), y: lerp(out[o].y, pos.y + 2, P.kT), atras: false }; } // as duas mãos sobem para segurar o teto
+  return out;
+}
+function v12Escudo(g, p, lx, ly, fx, fy) {
+  const P = p.v12, pos = v12PosEscudo(P, lx, ly, fx, fy), r = (P.pesado ? 6.4 : 5.4) + P.kF * 1.3 + P.kT * 1.2;
+  g.save(); g.translate(pos.x, pos.y);
+  const sx = lerp(lerp(0.75, 1, P.kF), 1.3, P.kT), sy = lerp(1, 0.55, P.kT); // de lado (fino) → de frente (cheio) → por cima (achatado)
+  g.scale(sx, sy); desenharEscudo(g, 0, 0, r);
+  if (P.pesado) { circulo(g, 0, 0, r * 0.62); g.lineWidth = 1; g.strokeStyle = '#6a6a6a'; g.stroke(); }
+  g.restore();
+}
+function v12ArmaIdle(g, p, maos, b) {
+  const P = p.v12; if (P.arma !== 'espada' && P.arma !== 'lanca') return; if (P.kT > 0.6) return;
+  const m = maos[P.escudo ? 1 : 0], prev = v12Mat; v12Mat = P.mat;
+  const kF = P.kF;
+  if (P.arma === 'espada') { const d = { x: lerp(b.lx * 0.3, b.fx, kF), y: lerp(-1, b.fy - 0.4, kF) }; desenharArma(g, { tipo: 'espada', x0: m.x, y0: m.y, x1: m.x + d.x * 13, y1: m.y + d.y * 13, d }); }
+  else { const d = { x: lerp(b.lx * 0.15, b.fx, kF), y: lerp(-1, b.fy * 0.9 - 0.15, kF) }; desenharArma(g, { tipo: 'lanca', x0: m.x, y0: m.y, x1: m.x + d.x * 18, y1: m.y + d.y * 18, d }); }
+  v12Mat = prev;
+}
+/* ---------- formação: lanças na 2ª fileira atrás dos escudos; quadrado de 16 ---------- */
+const v12Melee = m => m.filter(c => !(c.arma === 'arco' && c.flechas > 0));
+function v12PodeQuadrado(m) { const F = Object.values(V11.forms).find(F => F.membros === m); return v12Melee(m).length >= ((F && F.modo === 'quadrado') || agora() - (V12.ultQuad || -1e9) < 30 ? 12 : 16); } // já formado: segura o quadrado com baixas (vagas ficam abertas)
+function v12SlotsQuadrado(n) { // n = corpo a corpo. Lado s (3 com 16; cresce com mais gente), resto vai para o teto
+  const s = clamp(Math.floor((n - 4) / 4), 3, 7), H = Math.floor(s / 2) + 1, js = []; for (let k = 0; k < s; k++) js.push(k - Math.floor((s - 1) / 2));
+  js.sort((a, b) => Math.abs(a) - Math.abs(b) || a - b);
+  const parede = []; for (const j of js) { parede.push({ i: H, j, lado: 'f' }); parede.push({ i: j, j: -H, lado: 'e' }); parede.push({ i: j, j: H, lado: 'd' }); parede.push({ i: -H, j, lado: 't' }); } // prioridade: frente, esquerda, direita, trás
+  const dentro = []; for (let i = -(H - 1); i <= H - 1; i++) for (let j = -(H - 1); j <= H - 1; j++) if (i || j) dentro.push({ i, j, lado: 'teto' });
+  dentro.sort((a, b) => (Math.abs(a.i) === Math.abs(a.j) ? 0 : 1) - (Math.abs(b.i) === Math.abs(b.j) ? 0 : 1) || Math.hypot(a.i, a.j) - Math.hypot(b.i, b.j)); // diagonais primeiro (4 do teto com 16), centro livre para o resgate
+  return { parede, dentro, s, H };
+}
+{
+  const _vf = v11Formar; v11Formar = function (lado, dt) {
+    _vf(lado, dt); const F = V11.forms[lado]; if (!F) return;
+    const m = F.membros, P = (c, i, j, papel, dentro) => { c.slot11 = v11Tile(F.ax + F.ux * i + F.px * j, F.ay + F.uy * i + F.py * j); c.papel11 = papel; c.form11 = lado; c.dentro11 = !!dentro; };
+    for (const c of m) c.face12 = null;
+    if (F.modo === 'quadrado') {
+      const arq = c => c.arma === 'arco' && c.flechas > 0, mel = m.filter(c => !arq(c)).sort((a, b) => (b.escudo - a.escudo) || ((b.arma === 'lanca') - (a.arma === 'lanca')) || ((b.arma === 'espada') - (a.arma === 'espada')));
+      V12.ultQuad = agora(); F.n12 = Math.max(F.n12 || 0, mel.length); const { parede, dentro, s: lado16, H } = v12SlotsQuadrado(F.n12);
+      const asg = F.asg12 || (F.asg12 = new Map()); for (const c of [...asg.keys()]) if (!m.includes(c)) asg.delete(c); // caído/fora: a vaga fica aberta (sem inventar ninguém)
+      const usadoP = new Set([...asg.values()].filter(v => v.k === 'p').map(v => v.n)), usadoD = new Set([...asg.values()].filter(v => v.k === 'd').map(v => v.n));
+      for (const c of mel.concat(m.filter(arq))) if (!asg.has(c)) { let k = 'd', n = -1; if (!arq(c)) { n = parede.findIndex((_, i) => !usadoP.has(i)); if (n >= 0) k = 'p'; } if (k === 'd') n = dentro.findIndex((_, i) => !usadoD.has(i)); if (n < 0) continue; asg.set(c, { k, n }); (k === 'p' ? usadoP : usadoD).add(n); }
+      const murosL = [], roofL = [], arqL = [];
+      const outw = { f: [F.ux, F.uy], t: [-F.ux, -F.uy], e: [-F.px, -F.py], d: [F.px, F.py] };
+      for (const [c, v] of asg) { if (v.k === 'p') { const sl = parede[v.n]; P(c, sl.i, sl.j, 'frente'); c.face12 = { x: outw[sl.lado][0], y: outw[sl.lado][1], lado: sl.lado }; murosL.push(c); } else { const sl = dentro[v.n]; P(c, sl.i, sl.j, arq(c) ? 'arqueiro' : 'interno', true); c.face12 = null; (arq(c) ? arqL : roofL).push(c); } }
+      F.R = H; F.lado16 = lado16; F.linha = murosL; F.teto16 = roofL; F.centro = v11Tile(F.ax, F.ay);
+    } else if (F.linha && F.linha.some(c => c.escudo)) {
+      const lancas = F.linha.filter(c => c.arma === 'lanca' && !c.escudo); if (!lancas.length) return;
+      const escudos = F.linha.filter(c => !lancas.includes(c));
+      escudos.forEach((c, n) => P(c, 0, (n - (escudos.length - 1) / 2) * 1.1, 'frente'));
+      lancas.forEach((c, n) => { P(c, -1, (n - (lancas.length - 1) / 2) * 1.1, 'frente'); c.segunda12 = true; }); // 2ª fileira: estoca por trás dos escudos
+      F.formado = escudos.every(c => Math.hypot(c.x - c.slot11.x, c.y - c.slot11.y) < 0.9) && m.every(c => !c.slot11 || c.acao11 === 'atacar' || Math.hypot(c.x - c.slot11.x, c.y - c.slot11.y) < 1.6);
+    }
+  };
+  const _vl = v11Lutar; v11Lutar = function (c, t, dt) {
+    const r = _vl(c, t, dt);
+    if (c.face12 && t.fase === 'segurar') { const a = t.presa; const lado = c.face12; const ax = a ? a.x - c.x : 0, ay = a ? a.y - c.y : 0; const d = Math.hypot(ax, ay) || 1;
+      if (!(a && (ax * lado.x + ay * lado.y) / d > 0.5 && d < 3.2)) c.yawAlvo = Math.atan2(lado.x, lado.y); } // parede do quadrado olha para fora
+    return r;
+  };
+  const _vr = v11Resgatar; v11Resgatar = function (F, p) {
+    const roof = (F.teto16 || []).filter(c => c.escudo && !saude(c).caido && c.tarefa && c.tarefa.tipo === 'lutar' && (saude(c).dor || 0) < 0.45);
+    const ocupado = F.membros.some(o => o.tarefa && o.tarefa.tipo === 'resgatar') || colonos.some(o => o.volta12 && o.tarefa && o.tarefa.tipo === 'resgatar');
+    if (ocupado) return;
+    let cands = roof, cent = F.centro || v11Tile(F.ax, F.ay);
+    if (F.modo !== 'quadrado') { // linha: quem não está na frente (ou o da ponta) arrasta o ferido para trás da linha
+      cands = F.membros.filter(c => c.arma !== 'arco' && !saude(c).caido && (saude(c).dor || 0) < 0.45 && c.tarefa && c.tarefa.tipo === 'lutar' && !c.bandido).sort((a, b) => (a.papel11 === 'frente') - (b.papel11 === 'frente'));
+      cent = v11Tile(F.ax - (F.ux || 0) * 2.5, F.ay - (F.uy || 0) * 2.5);
+    }
+    if (cands.length) {
+      const c = cands.slice().sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0];
+      cancelar(c); p.resgatador = c; c.volta12 = F.lado;
+      c.tarefa = { tipo: 'resgatar', paciente: p, estilo: 'arrastar', fase: 'indo', t: 0, rp: 0, cama11: { x: cent.x, y: cent.y, real: false }, estilo11: 'arrastar' };
+      c.caminho = []; st11('resgates'); st12(F.modo === 'quadrado' ? 'resgateDoTeto' : 'resgateLinha'); log(F.modo === 'quadrado' ? `${c.nome} sai do teto de escudos para arrastar ${p.nome} para dentro do quadrado!` : `${c.nome} arrasta ${p.nome} para trás da linha!`, 'bom'); return;
+    }
+    if (F.modo === 'quadrado') return _vr(F, p);
+  };
+}
+function v12VoltarAoTeto() { // quem saiu do teto para resgatar volta para a formação
+  for (const c of colonos) if (c.volta12 && !(c.tarefa && c.tarefa.tipo === 'resgatar') && !saude(c).caido) {
+    const lado = c.volta12; c.volta12 = null; const e = v11InimigoPerto(c);
+    if (V11.forms[lado] && e && !(c.tarefa && c.tarefa.tipo === 'lutar')) { lutar(c, e); st12('voltouAoTeto'); log(`${c.nome} volta para o teto de escudos.`); }
+  }
+}
+let v12Tick = function (dt) { v12Estacas(dt); v12VoltarAoTeto(); };
+{ const _vt = v11Tick; v11Tick = function (dt) { _vt(dt); v12Tick(dt); }; }
+
+/* ---------- v12 equilíbrio: atacantes desistem antes, fuga para perto dos aliados, resgate garantido ---------- */
+{
+  const _gan2 = golpeAnimal; golpeAnimal = function (a, c) {
+    const r = _gan2(a, c); a.golpes12 = (a.golpes12 || 0) + 1;
+    const aliados = colonos.filter(o => o !== c && !saude(o).caido && v11Armado(o) && Math.hypot(o.x - a.x, o.y - a.y) < 4).length;
+    const lim = a.esp === 'urso' ? 7 : 6 - Math.min(2, aliados);
+    if (a.golpes12 >= lim && a.estado === 'atacar') { a.estado = 'partir'; a.caminho = []; a.alvo = null; st12('atacanteDesistiu'); log(`O ${a.nome.toLowerCase()} desiste do ataque e recua.`, 'bom'); for (const o of animais) if (o !== a && o.bando && o.bando === a.bando && !o.morto && o.estado === 'atacar' && (o.golpes12 || 0) >= lim - 2) { o.estado = 'partir'; o.caminho = []; } }
+    return r;
+  };
+  const _fug = iniciarFuga; iniciarFuga = function (c, de) {
+    _fug(c, de); if (c.bandido || !c.tarefa || c.tarefa.tipo !== 'fugir') return;
+    const al = colonos.filter(o => o !== c && !saude(o).caido && v11Armado(o) && (saude(o).dor || 0) < 0.45).sort((p, q) => Math.hypot(p.x - c.x, p.y - c.y) - Math.hypot(q.x - c.x, q.y - c.y))[0];
+    if (al && de && Math.hypot(al.x - de.x, al.y - de.y) > 1.5) { const s = tileDe(c), t = v11Tile(al.x - (de.x - al.x) * 0.3, al.y - (de.y - al.y) * 0.3), cam = aEstrela(s.x, s.y, t.x, t.y); if (cam && cam.length) { c.caminho = cam; st12('fugaParaAliado'); } }
+  };
+  const _lut = lutar; lutar = function (c, a, extra) {
+    if (!c.bandido && !(extra && extra.job) && a && a.animal && (perdaSangue(c) > 30 || (saude(c).dor || 0) > 0.5) && (c.recuo12 || 0) > agora()) return;
+    return _lut(c, a, extra);
+  };
+}
+function v12Resgate() {
+  // matilha/urso forçado deixa a colônia quando alguém cai (evita todos caídos de uma vez)
+  const caidos = colonos.filter(c => saude(c).caido && !saude(c).morto);
+  for (const c of caidos) if (!c.caiu12) { c.caiu12 = agora(); for (const a of animais) if (!a.morto && a.estado === 'atacar' && (a.forcado || a.alvo === c) && rnd() < 0.85) { a.estado = 'partir'; a.caminho = []; a.alvo = null; st12('recuoAposQueda'); } }
+  for (const c of colonos) if (!saude(c).caido) c.caiu12 = 0;
+  for (const c of colonos) if (c.tarefa && c.tarefa.tipo === 'fugir' && !c.recuo12) c.recuo12 = agora() + 45; else if (!(c.tarefa && c.tarefa.tipo === 'fugir') && c.recuo12 && agora() > c.recuo12) c.recuo12 = 0;
+  // ninguém fica caído sem socorro: quem está livre e perto vai buscar (mesmo sem prioridade de médico)
+  for (const p of caidos) {
+    if (p.resgatador || p.carregadoPor || (p.tarefa && p.tarefa.tipo === 'repousar') || agora() - p.caiu12 < 8) continue;
+    if (animais.some(a => !a.morto && a.estado === 'atacar' && Math.hypot(a.x - p.x, a.y - p.y) < 4) || bandidos().some(b => !saude(b).caido && !b.partindo && Math.hypot(b.x - p.x, b.y - p.y) < 4)) continue;
+    const livres = colonos.filter(c => c !== p && !saude(c).caido && !c.carregadoPor && fatorMov(c) > 0.45 && !(c.tarefa && ['resgatar', 'tratar', 'lutar', 'cacada'].includes(c.tarefa.tipo)));
+    const c = livres.sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y))[0]; if (!c) continue;
+    const pm = c.prioridades.medico; if (!pm) c.prioridades.medico = 4;
+    cancelar(c); c.dormindo = false; c.naCama = false; const ok = tarefaMedicaUrgente(c); if (!pm) c.prioridades.medico = pm;
+    if (ok) { st12('resgateGarantido'); }
+  }
+}
+{ const _vt2 = v12Tick; v12Tick = function (dt) { _vt2(dt); if ((V12.rt = (V12.rt || 0) - dt) <= 0) { V12.rt = 0.5; v12Resgate(); } }; }
+// modo dev: armas novas, defesa, ervas e 16 colonos armados
+for (const [k, n] of [['ESPADA_MADEIRA', 'Espada de madeira'], ['ESPADA', 'Espada de pedra'], ['LANCA_MADEIRA', 'Lança de madeira'], ['LANCA', 'Lança de pedra'], ['ERVAS', 'Ervas medicinais (x5)'], ['REMEDIO_ERVAS', 'Remédio de ervas (x3)']])
+  addDev({ id: 'v12_item_' + k, cat: 'Armas v12', nome: `Item: ${n} — clique no chão`, mapa: (p) => { if (!chaoFirme(p.x, p.y)) return 0; largarItem(p.x, p.y, k, k === 'ERVAS' ? 5 : k === 'REMEDIO_ERVAS' ? 3 : 1); return 1; } });
+for (const [k, a, m] of [['lm', 'lanca', 'madeira'], ['lp', 'lanca', 'pedra'], ['em', 'espada', 'madeira'], ['ep', 'espada', 'pedra']])
+  addDev({ id: 'v12_eq_' + k, cat: 'Armas v12', nome: `Equipar ${a === 'lanca' ? 'lança' : 'espada'} de ${m} (clique)`, mapa: (p) => colonoAlvo(p.x, p.y, c => { c.arma = a; c.mat12 = m; c.arcoLongo = false; }, a + ' ' + m) ? 1 : 0 });
+function v12Spawn16(x, y) {
+  const l = [];
+  for (let n = 0; n < 16; n++) { const q = livrePerto(x + (n % 4) - 2, y + Math.floor(n / 4) - 2) || { x, y }; const c = criarColonoExtra({ nome: 'Teste ' + (n + 1) }, q.x, q.y); c.arma = n % 2 ? 'espada' : 'lanca'; c.mat12 = 'pedra'; c.escudo = true; c.bandagens = 2; l.push(c); }
+  st12('spawn16'); return l;
+}
+addDev({ id: 'v12_16', cat: 'Combate v11', nome: '16 colonos armados (escudo + lança/espada) para o quadrado completo — clique', mapa: (p) => v12Spawn16(p.x, p.y).length });
 
 (async function iniciar() {
   redimensionar();
